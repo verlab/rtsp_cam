@@ -1,77 +1,81 @@
 # Docker Compose for RTSP Camera ROS 2 Package
-# Supports different hardware configurations
+# Single service with profile-based hardware configuration
+# 
+# Usage:
+#   docker compose --profile cpu up        # CPU deployment
+#   docker compose --profile nvidia up     # NVIDIA GPU
+#   docker compose --profile jetson up     # Jetson Nano  
+#   docker compose --profile dev up        # Development
 
 version: '3.8'
 
 services:
-  # CPU-only version
+  # CPU Profile
   rtsp-cam-cpu:
     build:
       context: ..
       dockerfile: docker/Dockerfile
       target: cpu
       args:
-        ROS_DISTRO: jazzy
-        UBUNTU_VERSION: 24.04
-    image: rtsp_cam:cpu-jazzy
+        ROS_DISTRO: ${ROS_DISTRO:-jazzy}
+        UBUNTU_VERSION: ${UBUNTU_VERSION:-24.04}
+    image: rtsp_cam:cpu-${ROS_DISTRO:-jazzy}
     container_name: rtsp_cam_cpu
     restart: unless-stopped
     network_mode: host
     environment:
-      - ROS_DOMAIN_ID=0
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
       - DECODER_TYPE=software
     volumes:
       - ../config/rtsp_cam_config.yaml:/ros2_ws/src/rtsp_cam/config/rtsp_cam_config.yaml:ro
-      - /tmp/rtsp_cam_photos:/tmp/rtsp_cam_photos
+      - ${PHOTO_DIR:-/tmp/rtsp_cam_photos}:/tmp/rtsp_cam_photos
     profiles:
       - cpu
 
-  # NVIDIA GPU version
+  # NVIDIA GPU Profile  
   rtsp-cam-nvidia:
     build:
       context: ..
       dockerfile: docker/Dockerfile
       target: nvidia
       args:
-        ROS_DISTRO: jazzy
-        UBUNTU_VERSION: 24.04
-        TARGET_PLATFORM: nvidia
-    image: rtsp_cam:nvidia-jazzy
+        ROS_DISTRO: ${ROS_DISTRO:-jazzy}
+        UBUNTU_VERSION: ${UBUNTU_VERSION:-24.04}
+    image: rtsp_cam:nvidia-${ROS_DISTRO:-jazzy}
     container_name: rtsp_cam_nvidia
     restart: unless-stopped
     network_mode: host
     environment:
-      - ROS_DOMAIN_ID=0
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
       - DECODER_TYPE=nvidia
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=video,compute,utility
+    runtime: nvidia
     volumes:
       - ../config/rtsp_cam_config.yaml:/ros2_ws/src/rtsp_cam/config/rtsp_cam_config.yaml:ro
-      - /tmp/rtsp_cam_photos:/tmp/rtsp_cam_photos
-    runtime: nvidia
+      - ${PHOTO_DIR:-/tmp/rtsp_cam_photos}:/tmp/rtsp_cam_photos
     profiles:
       - nvidia
 
-  # Jetson Nano version
+  # Jetson Nano Profile
   rtsp-cam-jetson:
     build:
       context: ..
       dockerfile: docker/Dockerfile
       target: jetson
       args:
-        ROS_DISTRO: jazzy
-        UBUNTU_VERSION: 24.04
-        TARGET_PLATFORM: jetson
-    image: rtsp_cam:jetson-jazzy
+        ROS_DISTRO: ${ROS_DISTRO:-jazzy}
+        UBUNTU_VERSION: ${UBUNTU_VERSION:-24.04}
+    image: rtsp_cam:jetson-${ROS_DISTRO:-jazzy}
     container_name: rtsp_cam_jetson
     restart: unless-stopped
     network_mode: host
     environment:
-      - ROS_DOMAIN_ID=0
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
       - DECODER_TYPE=jetson
     volumes:
       - ../config/rtsp_cam_config.yaml:/ros2_ws/src/rtsp_cam/config/rtsp_cam_config.yaml:ro
-      - /tmp/rtsp_cam_photos:/tmp/rtsp_cam_photos
+      - ${PHOTO_DIR:-/tmp/rtsp_cam_photos}:/tmp/rtsp_cam_photos
       - /usr/lib/aarch64-linux-gnu/tegra:/usr/lib/aarch64-linux-gnu/tegra:ro
     devices:
       - /dev/nvhost-ctrl
@@ -83,33 +87,27 @@ services:
     profiles:
       - jetson
 
-  # Development/testing service with all ROS tools
+  # Development Profile
   rtsp-cam-dev:
     build:
       context: ..
       dockerfile: docker/Dockerfile
       target: cpu
       args:
-        ROS_DISTRO: jazzy
-        UBUNTU_VERSION: 24.04
-    image: rtsp_cam:dev-jazzy
+        ROS_DISTRO: ${ROS_DISTRO:-jazzy}
+        UBUNTU_VERSION: ${UBUNTU_VERSION:-24.04}
+    image: rtsp_cam:dev-${ROS_DISTRO:-jazzy}
     container_name: rtsp_cam_dev
     restart: "no"
     network_mode: host
     environment:
-      - ROS_DOMAIN_ID=0
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
       - DECODER_TYPE=software
     volumes:
       - ../:/ros2_ws/src/rtsp_cam
-      - /tmp/rtsp_cam_photos:/tmp/rtsp_cam_photos
+      - ${PHOTO_DIR:-/tmp/rtsp_cam_photos}:/tmp/rtsp_cam_photos
     stdin_open: true
     tty: true
     command: bash
     profiles:
       - dev
-
-# Use profiles to select deployment type:
-# docker-compose --profile cpu up
-# docker-compose --profile nvidia up  
-# docker-compose --profile jetson up
-# docker-compose --profile dev up
