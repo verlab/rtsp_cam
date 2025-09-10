@@ -1,0 +1,115 @@
+# Docker Compose for RTSP Camera ROS 2 Package
+# Supports different hardware configurations
+
+version: '3.8'
+
+services:
+  # CPU-only version
+  rtsp-cam-cpu:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: cpu
+      args:
+        ROS_DISTRO: jazzy
+        UBUNTU_VERSION: 24.04
+    image: rtsp_cam:cpu-jazzy
+    container_name: rtsp_cam_cpu
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      - ROS_DOMAIN_ID=0
+      - DECODER_TYPE=software
+    volumes:
+      - ../config/rtsp_cam_config.yaml:/ros2_ws/src/rtsp_cam/config/rtsp_cam_config.yaml:ro
+      - /tmp/rtsp_cam_photos:/tmp/rtsp_cam_photos
+    profiles:
+      - cpu
+
+  # NVIDIA GPU version
+  rtsp-cam-nvidia:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: nvidia
+      args:
+        ROS_DISTRO: jazzy
+        UBUNTU_VERSION: 24.04
+        TARGET_PLATFORM: nvidia
+    image: rtsp_cam:nvidia-jazzy
+    container_name: rtsp_cam_nvidia
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      - ROS_DOMAIN_ID=0
+      - DECODER_TYPE=nvidia
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=video,compute,utility
+    volumes:
+      - ../config/rtsp_cam_config.yaml:/ros2_ws/src/rtsp_cam/config/rtsp_cam_config.yaml:ro
+      - /tmp/rtsp_cam_photos:/tmp/rtsp_cam_photos
+    runtime: nvidia
+    profiles:
+      - nvidia
+
+  # Jetson Nano version
+  rtsp-cam-jetson:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: jetson
+      args:
+        ROS_DISTRO: jazzy
+        UBUNTU_VERSION: 24.04
+        TARGET_PLATFORM: jetson
+    image: rtsp_cam:jetson-jazzy
+    container_name: rtsp_cam_jetson
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      - ROS_DOMAIN_ID=0
+      - DECODER_TYPE=jetson
+    volumes:
+      - ../config/rtsp_cam_config.yaml:/ros2_ws/src/rtsp_cam/config/rtsp_cam_config.yaml:ro
+      - /tmp/rtsp_cam_photos:/tmp/rtsp_cam_photos
+      - /usr/lib/aarch64-linux-gnu/tegra:/usr/lib/aarch64-linux-gnu/tegra:ro
+    devices:
+      - /dev/nvhost-ctrl
+      - /dev/nvhost-ctrl-gpu
+      - /dev/nvhost-prof-gpu
+      - /dev/nvmap
+      - /dev/nvhost-gpu
+      - /dev/nvhost-as-gpu
+    profiles:
+      - jetson
+
+  # Development/testing service with all ROS tools
+  rtsp-cam-dev:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: cpu
+      args:
+        ROS_DISTRO: jazzy
+        UBUNTU_VERSION: 24.04
+    image: rtsp_cam:dev-jazzy
+    container_name: rtsp_cam_dev
+    restart: "no"
+    network_mode: host
+    environment:
+      - ROS_DOMAIN_ID=0
+      - DECODER_TYPE=software
+    volumes:
+      - ../:/ros2_ws/src/rtsp_cam
+      - /tmp/rtsp_cam_photos:/tmp/rtsp_cam_photos
+    stdin_open: true
+    tty: true
+    command: bash
+    profiles:
+      - dev
+
+# Use profiles to select deployment type:
+# docker-compose --profile cpu up
+# docker-compose --profile nvidia up  
+# docker-compose --profile jetson up
+# docker-compose --profile dev up

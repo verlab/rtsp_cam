@@ -1,0 +1,62 @@
+# RTSP Camera Configuration
+# This file contains all the configuration parameters for generic RTSP cameras
+
+rtsp_cam:
+  ros__parameters:
+    # Camera connection parameters
+    camera_ip: "192.168.0.18"
+    camera_port: 554
+    username: "admin"
+    password: "admin"
+    
+    # RTSP stream URLs (customize for your camera)
+    main_stream_url: "rtsp://admin:admin@192.168.0.18:554/h264/ch1/main/av_stream"
+    sub_stream_url: "rtsp://admin:admin@192.168.0.18:554/h264/ch1/sub/av_stream"
+    
+    # PTZ control parameters (optional, for PTZ cameras)
+    onvif_port: 8999
+    http_port: 80
+    use_onvif: false  # Use HTTP interface when available
+    ptz_enabled: true
+    
+    # Stream configuration
+    main_stream_enabled: true
+    sub_stream_enabled: true
+    encoding: "h264"  # Options: "h264", "h265"
+    frame_rate: 30
+    resolution_width: 1920
+    resolution_height: 1080
+    
+    # Hardware decoding options: "software", "nvidia", "jetson", "vaapi"
+    decoder_type: "software"
+    
+    # GStreamer pipeline configuration (auto-generated based on decoder_type)
+    gst_pipeline_main: ""
+    gst_pipeline_sub: ""
+    
+    # PTZ movement parameters
+    pan_speed: 0.5
+    tilt_speed: 0.5
+    zoom_speed: 0.5
+    auto_stop_timeout: 2.0  # Auto-stop timeout in seconds
+    
+    # Photo capture parameters
+    photo_save_path: "/tmp/rtsp_cam_photos"
+    photo_format: "jpg"
+    photo_quality: 95
+    
+    # ROS topics and services
+    main_image_topic: "camera/main/image_raw"
+    sub_image_topic: "camera/sub/image_raw"
+    camera_info_topic: "camera/camera_info"
+    ptz_status_topic: "camera/ptz_status"
+    photo_service_name: "camera/take_photo"
+    
+    # Camera info parameters
+    camera_name: "rtsp_camera"
+    camera_frame_id: "camera_link"
+    
+    # Performance parameters
+    buffer_size: 1
+    queue_size: 10
+    timeout_ms: 5000 
