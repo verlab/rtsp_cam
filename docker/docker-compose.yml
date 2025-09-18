@@ -1,85 +1,29 @@
-# Docker Compose for RTSP Camera ROS 2 Package
-# Single service with profile-based hardware configuration
-# 
-# Usage:
-#   docker compose --profile cpu up        # CPU deployment
-#   docker compose --profile nvidia up     # NVIDIA GPU
-#   docker compose --profile jetson up     # Jetson Nano  
-#   docker compose --profile dev up        # Development
+# Docker Compose for RTSP Camera ROS 1 Noetic on Jetson Orin NX
+# Optimized for Jetson hardware with L4T base image
 
-# version: '3.8'  # Version is obsolete in modern Docker Compose
+version: '3.8'
 
 services:
-  # CPU Profile
-  rtsp-cam-cpu:
+  rtsp-cam:
     build:
       context: ..
       dockerfile: docker/Dockerfile
-      target: cpu
-      args:
-        ROS_DISTRO: ${ROS_DISTRO:-jazzy}
-        UBUNTU_VERSION: ${UBUNTU_VERSION:-24.04}
-    image: rtsp_cam:cpu-${ROS_DISTRO:-jazzy}
-    container_name: rtsp_cam_cpu
-    restart: unless-stopped
-    network_mode: host
-    environment:
-      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
-      - DECODER_TYPE=software
-    volumes:
-      - ../config/rtsp_cam_config.yaml:/ros2_ws/src/rtsp_cam/config/rtsp_cam_config.yaml:ro
-      - ${PHOTO_DIR:-/tmp/rtsp_cam_photos}:/tmp/rtsp_cam_photos
-    command: ["ros2", "launch", "rtsp_cam", "rtsp_cam.launch.py"]
-    profiles:
-      - cpu
-
-  # NVIDIA GPU Profile  
-  rtsp-cam-nvidia:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-      target: nvidia
-      args:
-        ROS_DISTRO: ${ROS_DISTRO:-jazzy}
-        UBUNTU_VERSION: ${UBUNTU_VERSION:-24.04}
-    image: rtsp_cam:nvidia-${ROS_DISTRO:-jazzy}
-    container_name: rtsp_cam_nvidia
-    restart: unless-stopped
-    network_mode: host
-    environment:
-      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
-      - DECODER_TYPE=nvidia
-      - NVIDIA_VISIBLE_DEVICES=all
-      - NVIDIA_DRIVER_CAPABILITIES=video,compute,utility
-    runtime: nvidia
-    volumes:
-      - ../config/rtsp_cam_config.yaml:/ros2_ws/src/rtsp_cam/config/rtsp_cam_config.yaml:ro
-      - ${PHOTO_DIR:-/tmp/rtsp_cam_photos}:/tmp/rtsp_cam_photos
-    command: ["ros2", "launch", "rtsp_cam", "rtsp_cam.launch.py"]
-    profiles:
-      - nvidia
-
-  # Jetson Nano Profile
-  # Note: Build this image on Jetson hardware for full L4T package support
-  rtsp-cam-jetson:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-      target: jetson
-      args:
-        ROS_DISTRO: ${ROS_DISTRO:-jazzy}
-        UBUNTU_VERSION: ${UBUNTU_VERSION:-24.04}
-    image: rtsp_cam:jetson-${ROS_DISTRO:-jazzy}
+    image: rtsp_cam:jetson-noetic
     container_name: rtsp_cam_jetson
     restart: unless-stopped
     network_mode: host
     environment:
-      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - ROS_MASTER_URI=http://localhost:11311
+      - ROS_HOSTNAME=localhost
       - DECODER_TYPE=jetson
+      - CUDA_VISIBLE_DEVICES=0
+      - GST_PLUGIN_PATH=/usr/lib/aarch64-linux-gnu/gstreamer-1.0
+      - LD_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu/tegra:/usr/lib/aarch64-linux-gnu:$LD_LIBRARY_PATH
     volumes:
-      - ../config/rtsp_cam_config.yaml:/ros2_ws/src/rtsp_cam/config/rtsp_cam_config.yaml:ro
+      - ../config/rtsp_cam_config.yaml:/catkin_ws/src/rtsp_cam/config/rtsp_cam_config.yaml:ro
       - ${PHOTO_DIR:-/tmp/rtsp_cam_photos}:/tmp/rtsp_cam_photos
       - /usr/lib/aarch64-linux-gnu/tegra:/usr/lib/aarch64-linux-gnu/tegra:ro
+      - /usr/lib/aarch64-linux-gnu/gstreamer-1.0:/usr/lib/aarch64-linux-gnu/gstreamer-1.0:ro
     devices:
       - /dev/nvhost-ctrl
       - /dev/nvhost-ctrl-gpu
@@ -87,31 +31,8 @@ services:
       - /dev/nvmap
       - /dev/nvhost-gpu
       - /dev/nvhost-as-gpu
-    command: ["ros2", "launch", "rtsp_cam", "rtsp_cam.launch.py"]
-    profiles:
-      - jetson
-
-  # Development Profile
-  rtsp-cam-dev:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-      target: cpu
-      args:
-        ROS_DISTRO: ${ROS_DISTRO:-jazzy}
-        UBUNTU_VERSION: ${UBUNTU_VERSION:-24.04}
-    image: rtsp_cam:dev-${ROS_DISTRO:-jazzy}
-    container_name: rtsp_cam_dev
-    restart: "no"
-    network_mode: host
-    environment:
-      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
-      - DECODER_TYPE=software
-    volumes:
-      - ../:/ros2_ws/src/rtsp_cam
-      - ${PHOTO_DIR:-/tmp/rtsp_cam_photos}:/tmp/rtsp_cam_photos
-    stdin_open: true
-    tty: true
-    command: bash
-    profiles:
-      - dev
+      - /dev/nvhost-ctrl-isp
+      - /dev/nvhost-ctrl-vi
+    ipc: host
+    privileged: true
+    command: ["roslaunch", "rtsp_cam", "rtsp_cam.launch"]
