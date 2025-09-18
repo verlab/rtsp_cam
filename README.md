@@ -1,18 +1,18 @@
-# RTSP Camera ROS 2 Package
+# RTSP Camera ROS 1 Noetic Package
 
-A comprehensive ROS 2 package for generic RTSP cameras with streaming, PTZ control, and photo capture capabilities. Supports multiple hardware decoding options including CPU, NVIDIA GPU, and Jetson Nano.
+A comprehensive ROS 1 Noetic package for generic RTSP cameras with streaming, PTZ control, and photo capture capabilities. Optimized for Jetson Orin NX with hardware acceleration support.
 
 ## Features
 
 - **Universal RTSP Support**: Works with any RTSP-compatible camera
-- **Multiple Decoder Options**: Software, NVIDIA GPU, Jetson Nano hardware acceleration
+- **Jetson Orin NX Optimized**: Hardware acceleration using nvv4l2decoder
+- **Multiple Decoder Options**: Software, NVIDIA GPU, Jetson hardware acceleration
 - **Dual Stream Support**: Main and secondary RTSP streams with H.264/H.265 encoding
 - **High Performance**: Uses GStreamer for efficient video processing
 - **PTZ Control**: Pan, Tilt, Zoom control via HTTP interfaces (when supported)
 - **Photo Capture**: Service-based photo capture with multiple methods
 - **Configurable**: Easy configuration through YAML files
-- **Docker Support**: Multi-platform containerization with hardware acceleration
-- **ROS 2 Native**: Built with modern ROS 2 best practices
+- **ROS 1 Noetic Native**: Built for ROS 1 Noetic with catkin build system
 
 ## Hardware Decoder Support
 
@@ -20,47 +20,43 @@ A comprehensive ROS 2 package for generic RTSP cameras with streaming, PTZ contr
 |--------------|-------------------|----------|
 | `software` | `avdec_h264`, `avdec_h265` | CPU-only systems, development |
 | `nvidia` | `nvh264dec`, `nvh265dec` | NVIDIA GPU systems (RTX, GTX, etc.) |
-| `jetson` | `nvv4l2decoder` | NVIDIA Jetson platforms (Nano, Xavier, Orin) |
+| `jetson` | `nvv4l2decoder` | NVIDIA Jetson platforms (Nano, Xavier, Orin NX) |
 | `vaapi` | `vaapih264dec`, `vaapih265dec` | Intel/AMD GPU systems |
 
-## Quick Start with Docker
+**Recommended for Jetson Orin NX**: Use `jetson` decoder type for optimal performance.
 
-### CPU-only deployment
+## Quick Start for Jetson Orin NX
+
+### Docker-based Installation (Recommended)
+
+The easiest way to run this package on Jetson Orin NX is using Docker with the L4T base image:
+
 ```bash
-cd rtsp_cam/docker
-docker-compose --profile cpu up -d
+# Clone the repository
+git clone <repository-url> rtsp_cam
+cd rtsp_cam
+
+# Build and run with Docker
+cd docker
+./build_jetson.sh
+docker-compose -f docker-compose.jetson.yml up -d
 ```
 
-### NVIDIA GPU deployment
-```bash
-# Requires nvidia-docker2
-cd rtsp_cam/docker
-docker-compose --profile nvidia up -d
-```
+### Manual Installation (Alternative)
 
-### Jetson Nano deployment
-```bash
-cd rtsp_cam/docker
-docker-compose --profile jetson up -d
-```
+If you prefer to install directly on the Jetson:
 
-## Installation from Source
-
-### Prerequisites
+#### Prerequisites
 
 ```bash
-# Install ROS 2 Jazzy (Ubuntu 24.04)
+# Install ROS 1 Noetic (Ubuntu 20.04)
+sudo sh -c 'echo "deb http://packages.ros.org/ros/ubuntu $(lsb_release -sc) main" > /etc/apt/sources.list.d/ros-latest.list'
+sudo apt-key adv --keyserver 'hkp://keyserver.ubuntu.com:80' --recv-key C1CF6E31E6BADE8868B172B4F42ED6FBAB17C654
 sudo apt update
-sudo apt install software-properties-common
-sudo add-apt-repository universe
-sudo apt update && sudo apt install curl -y
-sudo curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" | sudo tee /etc/apt/sources.list.d/ros2.list > /dev/null
-sudo apt update
-sudo apt install ros-jazzy-desktop
+sudo apt install -y ros-noetic-desktop-full
 
 # Install GStreamer and dependencies
-sudo apt install \
+sudo apt install -y \
     python3-pip python3-opencv \
     libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
     gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
@@ -68,33 +64,34 @@ sudo apt install \
     gstreamer1.0-libav gstreamer1.0-tools \
     libgirepository1.0-dev python3-gi python3-requests
 
-# Install ROS 2 packages
-sudo apt install \
-    ros-jazzy-cv-bridge ros-jazzy-image-transport \
-    ros-jazzy-camera-info-manager ros-jazzy-sensor-msgs \
-    ros-jazzy-geometry-msgs ros-jazzy-std-srvs
+# Install ROS 1 packages
+sudo apt install -y \
+    ros-noetic-cv-bridge ros-noetic-image-transport \
+    ros-noetic-camera-info-manager ros-noetic-sensor-msgs \
+    ros-noetic-geometry-msgs ros-noetic-std-srvs
 
-# For NVIDIA GPU support (optional)
-sudo apt install gstreamer1.0-plugins-nvcodec
-
-# For Jetson support (optional, on Jetson devices)
-sudo apt install nvidia-l4t-gstreamer gstreamer1.0-nvv4l2
+# For Jetson Orin NX support
+sudo apt install -y \
+    nvidia-l4t-gstreamer \
+    gstreamer1.0-nvv4l2 \
+    gstreamer1.0-plugins-nvcodec
 ```
 
-### Build Package
+#### Build Package
 
 ```bash
-# Create workspace
-mkdir -p ~/ros2_ws/src
-cd ~/ros2_ws/src
+# Create catkin workspace
+mkdir -p ~/catkin_ws/src
+cd ~/catkin_ws/src
 
 # Clone package
 git clone <repository-url> rtsp_cam
 
 # Build
-cd ~/ros2_ws
-colcon build --packages-select rtsp_cam
-source install/setup.bash
+cd ~/catkin_ws
+source /opt/ros/noetic/setup.bash
+catkin_make
+source devel/setup.bash
 ```
 
 ## Configuration
@@ -102,61 +99,73 @@ source install/setup.bash
 Edit `config/rtsp_cam_config.yaml`:
 
 ```yaml
-rtsp_cam:
-  ros__parameters:
-    # Camera connection
-    camera_ip: "192.168.1.100"
-    username: "admin" 
-    password: "password"
-    
-    # RTSP URLs (customize for your camera)
-    main_stream_url: "rtsp://admin:password@192.168.1.100:554/stream1"
-    sub_stream_url: "rtsp://admin:password@192.168.1.100:554/stream2"
-    
-    # Hardware decoding: "software", "nvidia", "jetson", "vaapi"
-    decoder_type: "software"
-    
-    # Stream settings
-    main_stream_enabled: true
-    sub_stream_enabled: false
-    frame_rate: 30
-    
-    # PTZ control (optional, for PTZ cameras)
-    ptz_enabled: true
-    http_port: 80
-    
-    # Photo capture
-    photo_save_path: "/tmp/rtsp_cam_photos"
+# Camera connection
+camera_ip: "192.168.1.100"
+username: "admin" 
+password: "password"
+
+# RTSP URLs (customize for your camera)
+main_stream_url: "rtsp://admin:password@192.168.1.100:554/stream1"
+sub_stream_url: "rtsp://admin:password@192.168.1.100:554/stream2"
+
+# Hardware decoding: "software", "nvidia", "jetson", "vaapi"
+decoder_type: "jetson"  # Optimized for Jetson Orin NX
+
+# Stream settings
+main_stream_enabled: true
+sub_stream_enabled: false
+frame_rate: 30
+
+# PTZ control (optional, for PTZ cameras)
+ptz_enabled: true
+http_port: 80
+
+# Photo capture
+photo_save_path: "/tmp/rtsp_cam_photos"
 ```
 
 ## Usage
 
-### Launch Complete System
+### Docker (Recommended for Jetson)
 
 ```bash
-ros2 launch rtsp_cam rtsp_cam.launch.py
+# Start the complete system
+docker-compose -f docker/docker-compose.jetson.yml up -d
+
+# View logs
+docker-compose -f docker/docker-compose.jetson.yml logs -f
+
+# Stop the system
+docker-compose -f docker/docker-compose.jetson.yml down
+
+# Development mode
+docker-compose -f docker/docker-compose.jetson.yml run rtsp-cam-dev
 ```
 
-### Individual Nodes
+### Manual Installation
 
 ```bash
-# Camera streaming
-ros2 run rtsp_cam rtsp_cam_node
+# Source the workspace
+source ~/catkin_ws/devel/setup.bash
 
-# PTZ controller (if camera supports it)
-ros2 run rtsp_cam rtsp_ptz_controller
+# Launch all nodes
+roslaunch rtsp_cam rtsp_cam.launch
 
-# Photo service
-ros2 run rtsp_cam rtsp_photo_service
+# Individual nodes
+rosrun rtsp_cam rtsp_cam_node.py
+rosrun rtsp_cam rtsp_ptz_controller.py
+rosrun rtsp_cam rtsp_photo_service.py
 ```
 
-### ROS 2 Interface
+### ROS 1 Interface
 
 #### Published Topics
 - `/camera/main/image_raw` (sensor_msgs/Image) - Main stream
 - `/camera/sub/image_raw` (sensor_msgs/Image) - Secondary stream  
-- `/camera/camera_info` (sensor_msgs/CameraInfo) - Camera info
+- `/camera/main/camera_info` (sensor_msgs/CameraInfo) - Main stream camera info
+- `/camera/sub/camera_info` (sensor_msgs/CameraInfo) - Sub stream camera info
 - `/camera/ptz_status` (std_msgs/String) - PTZ status (if available)
+- `/camera/joint_states` (sensor_msgs/JointState) - PTZ joint states (if available)
 
 #### Subscribed Topics
 - `/camera/ptz_cmd` (geometry_msgs/Twist) - PTZ commands (if available)

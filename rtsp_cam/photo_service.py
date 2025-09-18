@@ -13,12 +13,9 @@ import requests
 from typing import Optional, Tuple
 from datetime import datetime
 
-# ROS 2 imports
-import rclpy
-from rclpy.node import Node
-from rclpy.service import Service
-from rclpy.executors import MultiThreadedExecutor
-from std_srvs.srv import Trigger
+# ROS 1 imports
+import rospy
+from std_srvs.srv import Trigger, TriggerResponse
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 
@@ -249,16 +246,16 @@ class PhotoCaptureService:
             return self.capture_photo_http(save_path, filename)
 
 
-class JidetechPhotoService(Node):
+class RTSPPhotoService:
     """
-    ROS 2 Node for Jidetech Camera photo capture service.
+    ROS 1 Node for RTSP Camera photo capture service.
     
     This node provides a ROS service to capture photos from the camera.
     """
     
     def __init__(self):
         """Initialize the photo service node."""
-        super().__init__('jidetech_photo_service')
+        rospy.init_node('rtsp_photo_service', anonymous=True)
         
         # Declare parameters
         self._declare_parameters()
@@ -272,42 +269,42 @@ class JidetechPhotoService(Node):
         # Initialize bridge for image conversion
         self.bridge = CvBridge()
         
-        self.get_logger().info("Jidetech Photo Service initialized")
+        rospy.loginfo("RTSP Photo Service initialized")
     
     def _declare_parameters(self):
         """Declare ROS parameters."""
         # Camera connection parameters
-        self.declare_parameter('camera_ip', '192.168.0.18')
-        self.declare_parameter('username', 'admin')
-        self.declare_parameter('password', 'admin')
-        self.declare_parameter('http_port', 80)
-        self.declare_parameter('rtsp_port', 554)
+        self.camera_ip = rospy.get_param('~camera_ip', '192.168.0.18')
+        self.username = rospy.get_param('~username', 'admin')
+        self.password = rospy.get_param('~password', 'admin')
+        self.http_port = rospy.get_param('~http_port', 80)
+        self.rtsp_port = rospy.get_param('~rtsp_port', 554)
         
         # Stream URLs
-        self.declare_parameter('main_stream_url', 
+        self.main_stream_url = rospy.get_param('~main_stream_url', 
                               'rtsp://admin:admin@192.168.0.18:554/h264/ch1/main/av_stream')
         
         # Resolution parameters
-        self.declare_parameter('resolution_width', 1920)
-        self.declare_parameter('resolution_height', 1080)
+        self.resolution_width = rospy.get_param('~resolution_width', 1920)
+        self.resolution_height = rospy.get_param('~resolution_height', 1080)
         
         # Photo capture parameters
-        self.declare_parameter('photo_save_path', '/tmp/jidetech_photos')
-        self.declare_parameter('photo_format', 'jpg')
-        self.declare_parameter('photo_quality', 95)
-        self.declare_parameter('prefer_http', True)
+        self.photo_save_path = rospy.get_param('~photo_save_path', '/tmp/rtsp_cam_photos')
+        self.photo_format = rospy.get_param('~photo_format', 'jpg')
+        self.photo_quality = rospy.get_param('~photo_quality', 95)
+        self.prefer_http = rospy.get_param('~prefer_http', True)
         
     def _init_photo_service(self):
         """Initialize photo capture service."""
-        camera_ip = self.get_parameter('camera_ip').value
-        username = self.get_parameter('username').value
-        password = self.get_parameter('password').value
-        http_port = self.get_parameter('http_port').value
-        rtsp_port = self.get_parameter('rtsp_port').value
-        main_stream_url = self.get_parameter('main_stream_url').value
-        resolution_width = self.get_parameter('resolution_width').value
-        resolution_height = self.get_parameter('resolution_height').value
-        photo_quality = self.get_parameter('photo_quality').value
+        camera_ip = self.camera_ip
+        username = self.username
+        password = self.password
+        http_port = self.http_port
+        rtsp_port = self.rtsp_port
+        main_stream_url = self.main_stream_url
+        resolution_width = self.resolution_width
+        resolution_height = self.resolution_height
+        photo_quality = self.photo_quality
         
         self.photo_service = PhotoCaptureService(
             camera_ip, username, password, http_port, rtsp_port,
@@ -316,32 +313,31 @@ class JidetechPhotoService(Node):
     
     def _init_service(self):
         """Initialize ROS service."""
-        self.photo_srv = self.create_service(
-            Trigger,
+        self.photo_srv = rospy.Service(
             'take_photo',
+            Trigger,
             self._take_photo_callback
         )
     
-    def _take_photo_callback(self, request, response):
+    def _take_photo_callback(self, request):
         """
         Callback for photo capture service.
         
         Args:
             request: Service request
-            response: Service response
             
         Returns:
             Service response with success status and message
         """
         try:
             # Get parameters
-            save_path = self.get_parameter('photo_save_path').value
-            prefer_http = self.get_parameter('prefer_http').value
-            photo_format = self.get_parameter('photo_format').value
+            save_path = self.photo_save_path
+            prefer_http = self.prefer_http
+            photo_format = self.photo_format
             
             # Generate filename with timestamp
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"jidetech_photo_{timestamp}.{photo_format}"
+            filename = f"rtsp_photo_{timestamp}.{photo_format}"
             
             # Capture photo
             success, message = self.photo_service.capture_photo_auto(
@@ -349,23 +345,18 @@ class JidetechPhotoService(Node):
             )
             
             if success:
-                response.success = True
-                response.message = message
-                self.get_logger().info(f"Photo captured: {message}")
+                rospy.loginfo(f"Photo captured: {message}")
+                return TriggerResponse(success=True, message=message)
             else:
-                response.success = False
-                response.message = message
-                self.get_logger().error(f"Photo capture failed: {message}")
+                rospy.logerr(f"Photo capture failed: {message}")
+                return TriggerResponse(success=False, message=message)
             
         except Exception as e:
-            response.success = False
-            response.message = f"Error in photo capture service: {str(e)}"
-            self.get_logger().error(f"Photo capture service error: {str(e)}")
-        
-        return response
+            error_msg = f"Error in photo capture service: {str(e)}"
+            rospy.logerr(f"Photo capture service error: {str(e)}")
+            return TriggerResponse(success=False, message=error_msg)
     
-    def capture_photo_from_topic(self, image_msg: Image, save_path: str, 
-                                filename: Optional[str] = None) -> Tuple[bool, str]:
+    def capture_photo_from_topic(self, image_msg, save_path, filename=None):
         """
         Capture photo from ROS image message.
         
@@ -384,8 +375,8 @@ class JidetechPhotoService(Node):
             # Generate filename if not provided
             if filename is None:
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                photo_format = self.get_parameter('photo_format').value
-                filename = f"jidetech_photo_{timestamp}.{photo_format}"
+                photo_format = self.photo_format
+                filename = f"rtsp_photo_{timestamp}.{photo_format}"
             
             # Full path for the photo
             photo_path = os.path.join(save_path, filename)
@@ -394,9 +385,9 @@ class JidetechPhotoService(Node):
             cv_image = self.bridge.imgmsg_to_cv2(image_msg, "bgr8")
             
             # Get configured resolution and quality
-            resolution_width = self.get_parameter('resolution_width').value
-            resolution_height = self.get_parameter('resolution_height').value
-            photo_quality = self.get_parameter('photo_quality').value
+            resolution_width = self.resolution_width
+            resolution_height = self.resolution_height
+            photo_quality = self.photo_quality
             
             # Resize image to configured resolution if needed
             if cv_image.shape[1] != resolution_width or cv_image.shape[0] != resolution_height:
@@ -411,20 +402,14 @@ class JidetechPhotoService(Node):
             return False, f"Error capturing photo from topic: {str(e)}"
 
 
-def main(args=None):
+def main():
     """Main function for the photo service node."""
-    rclpy.init(args=args)
-    
     try:
         # Create photo service node
-        photo_node = JidetechPhotoService()
-        
-        # Create executor
-        executor = MultiThreadedExecutor()
-        executor.add_node(photo_node)
+        photo_node = RTSPPhotoService()
         
         # Spin the node
-        executor.spin()
+        rospy.spin()
         
     except KeyboardInterrupt:
         print("Photo service node interrupted by user")
@@ -434,7 +419,6 @@ def main(args=None):
         # Cleanup
         if 'photo_node' in locals():
             photo_node.destroy_node()
-        rclpy.shutdown()
 
 
 if __name__ == '__main__':

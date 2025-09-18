@@ -26,9 +26,7 @@ Commands:
 Author: rezeck <rezeck@ufmg.br>
 """
 
-import rclpy
-from rclpy.node import Node
-from rclpy.executors import MultiThreadedExecutor
+import rospy
 from geometry_msgs.msg import Twist
 from sensor_msgs.msg import JointState
 from std_msgs.msg import String
@@ -408,16 +406,16 @@ class RTSPCameraPTZController:
         }
 
 
-class RTSPCameraPTZNode(Node):
+class RTSPCameraPTZNode:
     """
-    ROS 2 Node for Jidetech PTZ control.
+    ROS 1 Node for RTSP PTZ control.
     
     This node provides PTZ control via ROS topics and services.
     """
     
     def __init__(self):
         """Initialize the PTZ node."""
-        super().__init__('rtsp_ptz_controller')
+        rospy.init_node('rtsp_ptz_controller', anonymous=True)
         
         # Declare parameters
         self._declare_parameters()
@@ -431,85 +429,85 @@ class RTSPCameraPTZNode(Node):
         # Start status publishing timer
         self._init_status_timer()
         
-        self.get_logger().info("RTSP Camera PTZ Controller initialized")
+        rospy.loginfo("RTSP Camera PTZ Controller initialized")
     
     def _declare_parameters(self):
         """Declare ROS parameters."""
         # Camera connection parameters
-        self.declare_parameter('camera_ip', '192.168.0.18')
-        self.declare_parameter('username', 'admin')
-        self.declare_parameter('password', 'admin')
-        self.declare_parameter('http_port', 80)
-        self.declare_parameter('timeout_ms', 5000)
+        self.camera_ip = rospy.get_param('~camera_ip', '192.168.0.18')
+        self.username = rospy.get_param('~username', 'admin')
+        self.password = rospy.get_param('~password', 'admin')
+        self.http_port = rospy.get_param('~http_port', 80)
+        self.timeout_ms = rospy.get_param('~timeout_ms', 5000)
         
         # PTZ control parameters
-        self.declare_parameter('default_pan_speed', 50)
-        self.declare_parameter('default_tilt_speed', 50)
-        self.declare_parameter('auto_stop_duration', 0.1)
+        self.default_pan_speed = rospy.get_param('~default_pan_speed', 50)
+        self.default_tilt_speed = rospy.get_param('~default_tilt_speed', 50)
+        self.auto_stop_duration = rospy.get_param('~auto_stop_duration', 0.1)
         
         # Topic names
-        self.declare_parameter('ptz_cmd_topic', 'ptz_cmd')
-        self.declare_parameter('ptz_status_topic', 'ptz_status')
-        self.declare_parameter('joint_states_topic', 'joint_states')
+        self.ptz_cmd_topic = rospy.get_param('~ptz_cmd_topic', 'ptz_cmd')
+        self.ptz_status_topic = rospy.get_param('~ptz_status_topic', 'ptz_status')
+        self.joint_states_topic = rospy.get_param('~joint_states_topic', 'joint_states')
         
         # Enable/disable flags
-        self.declare_parameter('enable_ptz_control', True)
-        self.declare_parameter('enable_status_publishing', True)
-        self.declare_parameter('status_publish_rate', 10.0)
+        self.enable_ptz_control = rospy.get_param('~enable_ptz_control', True)
+        self.enable_status_publishing = rospy.get_param('~enable_status_publishing', True)
+        self.status_publish_rate = rospy.get_param('~status_publish_rate', 10.0)
     
     def _init_ptz_controller(self):
         """Initialize PTZ controller."""
-        camera_ip = self.get_parameter('camera_ip').value
-        username = self.get_parameter('username').value
-        password = self.get_parameter('password').value
-        http_port = self.get_parameter('http_port').value
-        timeout_ms = self.get_parameter('timeout_ms').value
+        camera_ip = self.camera_ip
+        username = self.username
+        password = self.password
+        http_port = self.http_port
+        timeout_ms = self.timeout_ms
         
-        self.ptz_controller = JidetechPTZController(
+        self.ptz_controller = RTSPCameraPTZController(
             camera_ip, username, password, http_port, timeout_ms
         )
         
         # Set default speeds
-        default_pan_speed = self.get_parameter('default_pan_speed').value
-        default_tilt_speed = self.get_parameter('default_tilt_speed').value
-        auto_stop_duration = self.get_parameter('auto_stop_duration').value
+        default_pan_speed = self.default_pan_speed
+        default_tilt_speed = self.default_tilt_speed
+        auto_stop_duration = self.auto_stop_duration
         
         self.ptz_controller.set_speed(default_pan_speed, default_tilt_speed)
         self.ptz_controller.auto_stop_duration = auto_stop_duration
     
     def _init_topics(self):
         """Initialize ROS topics."""
-        enable_ptz = self.get_parameter('enable_ptz_control').value
+        enable_ptz = self.enable_ptz_control
         
         if enable_ptz:
             # PTZ command subscriber
-            ptz_cmd_topic = self.get_parameter('ptz_cmd_topic').value
-            self.ptz_cmd_sub = self.create_subscription(
-                Twist,
+            ptz_cmd_topic = self.ptz_cmd_topic
+            self.ptz_cmd_sub = rospy.Subscriber(
                 ptz_cmd_topic,
+                Twist,
                 self._ptz_cmd_callback,
-                10
+                queue_size=10
             )
         
         # Status publishers
-        enable_status = self.get_parameter('enable_status_publishing').value
+        enable_status = self.enable_status_publishing
         if enable_status:
-            ptz_status_topic = self.get_parameter('ptz_status_topic').value
-            joint_states_topic = self.get_parameter('joint_states_topic').value
+            ptz_status_topic = self.ptz_status_topic
+            joint_states_topic = self.joint_states_topic
             
-            self.ptz_status_pub = self.create_publisher(String, ptz_status_topic, 10)
-            self.joint_states_pub = self.create_publisher(JointState, joint_states_topic, 10)
+            self.ptz_status_pub = rospy.Publisher(ptz_status_topic, String, queue_size=10)
+            self.joint_states_pub = rospy.Publisher(joint_states_topic, JointState, queue_size=10)
     
     def _init_status_timer(self):
         """Initialize status publishing timer."""
-        enable_status = self.get_parameter('enable_status_publishing').value
+        enable_status = self.enable_status_publishing
         if enable_status:
-            status_rate = self.get_parameter('status_publish_rate').value
+            status_rate = self.status_publish_rate
             timer_period = 1.0 / status_rate
             
-            self.status_timer = self.create_timer(timer_period, self._publish_status)
+            self.status_timer = rospy.Timer(rospy.Duration(timer_period), self._publish_status)
     
-    def _ptz_cmd_callback(self, msg: Twist):
+    def _ptz_cmd_callback(self, msg):
         """
         Callback for PTZ command messages.
         
@@ -517,25 +515,25 @@ class RTSPCameraPTZNode(Node):
             msg: ROS Twist message with PTZ commands
         """
         try:
-            enable_ptz = self.get_parameter('enable_ptz_control').value
+            enable_ptz = self.enable_ptz_control
             if not enable_ptz:
-                self.get_logger().warn("PTZ control is disabled")
+                rospy.logwarn("PTZ control is disabled")
                 return
             
-            self.get_logger().info(f"Received PTZ command: linear=({msg.linear.x:.2f}, {msg.linear.y:.2f}, {msg.linear.z:.2f})")
+            rospy.loginfo(f"Received PTZ command: linear=({msg.linear.x:.2f}, {msg.linear.y:.2f}, {msg.linear.z:.2f})")
             
             # Process twist command
             success = self.ptz_controller.process_twist_command(msg)
             
             if success:
-                self.get_logger().info("PTZ command processed successfully")
+                rospy.loginfo("PTZ command processed successfully")
             else:
-                self.get_logger().warn("Failed to process PTZ command")
+                rospy.logwarn("Failed to process PTZ command")
                 
         except Exception as e:
-            self.get_logger().error(f"Error processing PTZ command: {str(e)}")
+            rospy.logerr(f"Error processing PTZ command: {str(e)}")
     
-    def _publish_status(self):
+    def _publish_status(self, event):
         """Publish PTZ status information."""
         try:
             # Get PTZ status
@@ -548,7 +546,7 @@ class RTSPCameraPTZNode(Node):
             
             # Publish joint states
             joint_msg = JointState()
-            joint_msg.header.stamp = self.get_clock().now().to_msg()
+            joint_msg.header.stamp = rospy.Time.now()
             joint_msg.name = ['pan_joint', 'tilt_joint', 'zoom_joint']
             joint_msg.position = [
                 math.radians(status['pan']),
@@ -561,23 +559,17 @@ class RTSPCameraPTZNode(Node):
             self.joint_states_pub.publish(joint_msg)
             
         except Exception as e:
-            self.get_logger().error(f"Error publishing PTZ status: {str(e)}")
+            rospy.logerr(f"Error publishing PTZ status: {str(e)}")
 
 
-def main(args=None):
+def main():
     """Main function for the PTZ controller node."""
-    rclpy.init(args=args)
-    
     try:
         # Create PTZ controller node
-        ptz_node = JidetechPTZNode()
-        
-        # Create executor
-        executor = MultiThreadedExecutor()
-        executor.add_node(ptz_node)
+        ptz_node = RTSPCameraPTZNode()
         
         # Spin the node
-        executor.spin()
+        rospy.spin()
         
     except KeyboardInterrupt:
         print("PTZ controller node interrupted by user")
@@ -587,7 +579,6 @@ def main(args=None):
         # Cleanup
         if 'ptz_node' in locals():
             ptz_node.destroy_node()
-        rclpy.shutdown()
 
 
 if __name__ == '__main__':

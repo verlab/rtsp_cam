@@ -18,10 +18,8 @@ gi.require_version('Gst', '1.0')
 gi.require_version('GstApp', '1.0')
 from gi.repository import Gst, GstApp, GLib
 
-# ROS 2 imports
-import rclpy
-from rclpy.node import Node
-from rclpy.executors import MultiThreadedExecutor
+# ROS 1 imports
+import rospy
 from sensor_msgs.msg import Image, CameraInfo
 from cv_bridge import CvBridge
 
@@ -259,9 +257,9 @@ class RTSPCameraStreamer:
         self.stop()
 
 
-class RTSPCameraNode(Node):
+class RTSPCameraNode:
     """
-    ROS 2 Node for generic RTSP Camera streaming.
+    ROS 1 Node for generic RTSP Camera streaming.
     
     This node publishes camera images and camera info to ROS topics.
     """
@@ -273,7 +271,7 @@ class RTSPCameraNode(Node):
         Args:
             stream_type: Type of stream ("main" or "sub")
         """
-        super().__init__(f'rtsp_cam_{stream_type}_node')
+        rospy.init_node(f'rtsp_cam_{stream_type}_node', anonymous=True)
         
         self.stream_type = stream_type
         self.camera_streamer = None
@@ -289,91 +287,91 @@ class RTSPCameraNode(Node):
         self._init_camera_streamer()
         
         # Create timer for publishing using configured frame rate
-        frame_rate = self.get_parameter('frame_rate').value
-        self.timer = self.create_timer(1.0/frame_rate, self._publish_frame)
+        frame_rate = rospy.get_param('~frame_rate', 30)
+        self.timer = rospy.Timer(rospy.Duration(1.0/frame_rate), self._publish_frame)
         
-        self.get_logger().info(f"RTSP Camera {stream_type} node initialized with {frame_rate} FPS")
+        rospy.loginfo(f"RTSP Camera {stream_type} node initialized with {frame_rate} FPS")
     
     def _declare_parameters(self):
         """Declare ROS parameters."""
         # Camera connection parameters
-        self.declare_parameter('camera_ip', '192.168.0.18')
-        self.declare_parameter('username', 'admin')
-        self.declare_parameter('password', 'admin')
-        self.declare_parameter('camera_port', 554)
+        self.camera_ip = rospy.get_param('~camera_ip', '192.168.0.18')
+        self.username = rospy.get_param('~username', 'admin')
+        self.password = rospy.get_param('~password', 'admin')
+        self.camera_port = rospy.get_param('~camera_port', 554)
         
         # Stream URLs
-        self.declare_parameter('main_stream_url', 
+        self.main_stream_url = rospy.get_param('~main_stream_url', 
                               'rtsp://admin:admin@192.168.0.18:554/h264/ch1/main/av_stream')
-        self.declare_parameter('sub_stream_url', 
+        self.sub_stream_url = rospy.get_param('~sub_stream_url', 
                               'rtsp://admin:admin@192.168.0.18:554/h264/ch1/sub/av_stream')
         
         # Stream configuration
-        self.declare_parameter('main_stream_enabled', True)
-        self.declare_parameter('sub_stream_enabled', True)
-        self.declare_parameter('encoding', 'h264')
-        self.declare_parameter('frame_rate', 30)
-        self.declare_parameter('resolution_width', 1920)
-        self.declare_parameter('resolution_height', 1080)
+        self.main_stream_enabled = rospy.get_param('~main_stream_enabled', True)
+        self.sub_stream_enabled = rospy.get_param('~sub_stream_enabled', True)
+        self.encoding = rospy.get_param('~encoding', 'h264')
+        self.frame_rate = rospy.get_param('~frame_rate', 30)
+        self.resolution_width = rospy.get_param('~resolution_width', 1920)
+        self.resolution_height = rospy.get_param('~resolution_height', 1080)
         
         # Camera info parameters
-        self.declare_parameter('camera_name', 'rtsp_camera')
-        self.declare_parameter('camera_frame_id', 'camera_link')
+        self.camera_name = rospy.get_param('~camera_name', 'rtsp_camera')
+        self.camera_frame_id = rospy.get_param('~camera_frame_id', 'camera_link')
         
         # Decoder parameters
-        self.declare_parameter('decoder_type', 'software')
+        self.decoder_type = rospy.get_param('~decoder_type', 'software')
         
         # Performance parameters
-        self.declare_parameter('buffer_size', 1)
-        self.declare_parameter('queue_size', 10)
-        self.declare_parameter('timeout_ms', 5000)
+        self.buffer_size = rospy.get_param('~buffer_size', 1)
+        self.queue_size = rospy.get_param('~queue_size', 10)
+        self.timeout_ms = rospy.get_param('~timeout_ms', 5000)
         
         # GStreamer pipeline parameters
-        self.declare_parameter('gst_pipeline_main', '')
-        self.declare_parameter('gst_pipeline_sub', '')
+        self.gst_pipeline_main = rospy.get_param('~gst_pipeline_main', '')
+        self.gst_pipeline_sub = rospy.get_param('~gst_pipeline_sub', '')
         
     def _init_publishers(self):
         """Initialize ROS publishers."""
-        queue_size = self.get_parameter('queue_size').value
+        queue_size = self.queue_size
         
         # Image publisher
-        self.image_pub = self.create_publisher(
-            Image,
+        self.image_pub = rospy.Publisher(
             'image_raw',
-            queue_size
+            Image,
+            queue_size=queue_size
         )
         
         # Camera info publisher
-        self.camera_info_pub = self.create_publisher(
-            CameraInfo,
+        self.camera_info_pub = rospy.Publisher(
             'camera_info',
-            queue_size
+            CameraInfo,
+            queue_size=queue_size
         )
         
     def _init_camera_streamer(self):
         """Initialize the camera streamer."""
         # Get stream URL based on stream type
         if self.stream_type == "main":
-            rtsp_url = self.get_parameter('main_stream_url').value
-            stream_enabled = self.get_parameter('main_stream_enabled').value
+            rtsp_url = self.main_stream_url
+            stream_enabled = self.main_stream_enabled
         else:
-            rtsp_url = self.get_parameter('sub_stream_url').value
-            stream_enabled = self.get_parameter('sub_stream_enabled').value
+            rtsp_url = self.sub_stream_url
+            stream_enabled = self.sub_stream_enabled
         
         # Check if stream is enabled
         if not stream_enabled:
-            self.get_logger().warn(f"{self.stream_type} stream is disabled in configuration")
+            rospy.logwarn(f"{self.stream_type} stream is disabled in configuration")
             return
         
         # Get performance parameters
-        buffer_size = self.get_parameter('buffer_size').value
-        decoder_type = self.get_parameter('decoder_type').value
+        buffer_size = self.buffer_size
+        decoder_type = self.decoder_type
         
         # Get GStreamer pipeline configuration
         if self.stream_type == "main":
-            gst_pipeline = self.get_parameter('gst_pipeline_main').value
+            gst_pipeline = self.gst_pipeline_main
         else:
-            gst_pipeline = self.get_parameter('gst_pipeline_sub').value
+            gst_pipeline = self.gst_pipeline_sub
         
         # Use custom pipeline if specified, otherwise use empty string (will use default)
         gst_pipeline = gst_pipeline if gst_pipeline else None
@@ -387,23 +385,23 @@ class RTSPCameraNode(Node):
         # Start streaming
         try:
             self.camera_streamer.start()
-            self.get_logger().info(f"Started {self.stream_type} stream")
+            rospy.loginfo(f"Started {self.stream_type} stream")
         except Exception as e:
-            self.get_logger().error(f"Failed to start {self.stream_type} stream: {str(e)}")
+            rospy.logerr(f"Failed to start {self.stream_type} stream: {str(e)}")
     
     def _on_new_frame(self, frame):
         """Callback for new frame from camera streamer."""
         # Store frame for publishing
         self.current_frame = frame
     
-    def _publish_frame(self):
+    def _publish_frame(self, event):
         """Publish current frame to ROS topic."""
         if hasattr(self, 'current_frame') and self.current_frame is not None:
             try:
                 # Convert frame to ROS message
                 ros_image = self.bridge.cv2_to_imgmsg(self.current_frame, "bgr8")
-                ros_image.header.stamp = self.get_clock().now().to_msg()
-                ros_image.header.frame_id = self.get_parameter('camera_frame_id').value
+                ros_image.header.stamp = rospy.Time.now()
+                ros_image.header.frame_id = self.camera_frame_id
                 
                 # Publish image
                 self.image_pub.publish(ros_image)
@@ -412,17 +410,17 @@ class RTSPCameraNode(Node):
                 self._publish_camera_info()
                 
             except Exception as e:
-                self.get_logger().error(f"Error publishing frame: {str(e)}")
+                rospy.logerr(f"Error publishing frame: {str(e)}")
     
     def _publish_camera_info(self):
         """Publish camera info message."""
         camera_info = CameraInfo()
-        camera_info.header.stamp = self.get_clock().now().to_msg()
-        camera_info.header.frame_id = self.get_parameter('camera_frame_id').value
+        camera_info.header.stamp = rospy.Time.now()
+        camera_info.header.frame_id = self.camera_frame_id
         
         # Set camera parameters from configuration
-        camera_info.width = self.get_parameter('resolution_width').value
-        camera_info.height = self.get_parameter('resolution_height').value
+        camera_info.width = self.resolution_width
+        camera_info.height = self.resolution_height
         
         # Set distortion model (you may need to calibrate your camera)
         camera_info.distortion_model = "plumb_bob"
@@ -452,23 +450,16 @@ class RTSPCameraNode(Node):
         """Cleanup when node is destroyed."""
         if self.camera_streamer:
             self.camera_streamer.stop()
-        super().destroy_node()
 
 
-def main(args=None):
+def main():
     """Main function for the camera node."""
-    rclpy.init(args=args)
-    
     try:
         # Create camera node (default to main stream)
         camera_node = RTSPCameraNode("main")
         
-        # Create executor
-        executor = MultiThreadedExecutor()
-        executor.add_node(camera_node)
-        
         # Spin the node
-        executor.spin()
+        rospy.spin()
         
     except KeyboardInterrupt:
         print("Camera node interrupted by user")
@@ -478,7 +469,6 @@ def main(args=None):
         # Cleanup
         if 'camera_node' in locals():
             camera_node.destroy_node()
-        rclpy.shutdown()
 
 
 if __name__ == '__main__':

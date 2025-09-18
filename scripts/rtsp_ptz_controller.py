@@ -1,44 +1,35 @@
 #!/usr/bin/env python3
 """
-Generic RTSP Camera PTZ Controller Node
+Generic RTSP Camera PTZ Controller Node for ROS 1 Noetic
 
 This script runs the PTZ control node for RTSP cameras with PTZ capabilities.
-It provides pan, tilt, and zoom control via ONVIF or HTTP interfaces.
+It provides pan, tilt, and zoom control via HTTP interfaces.
+Optimized for Jetson Orin NX.
 """
 
 import sys
 import argparse
-import rclpy
-from rclpy.executors import MultiThreadedExecutor
+import rospy
 
 from rtsp_cam.ptz_controller import RTSPCameraPTZNode
 
 
-def main(args=None):
+def main():
     """Main function for the PTZ controller node."""
     # Parse command line arguments
-    parser = argparse.ArgumentParser(description='RTSP Camera PTZ Controller Node')
-    parser.add_argument('--ros-args', nargs='*', help='ROS arguments')
+    parser = argparse.ArgumentParser(description='RTSP Camera PTZ Controller Node for ROS 1 Noetic')
     parser.add_argument('--log-level', default='info', 
                        choices=['debug', 'info', 'warn', 'error'],
                        help='Log level')
     
-    # Parse known args (ROS 2 will handle unknown args)
-    args, unknown = parser.parse_known_args()
-    
-    # Initialize ROS 2
-    rclpy.init(args=unknown)
+    args = parser.parse_args()
     
     try:
         # Create PTZ controller node
         ptz_node = RTSPCameraPTZNode()
         
-        # Create executor
-        executor = MultiThreadedExecutor()
-        executor.add_node(ptz_node)
-        
         # Spin the node
-        executor.spin()
+        rospy.spin()
         
     except KeyboardInterrupt:
         print("PTZ controller node interrupted by user")
@@ -48,7 +39,6 @@ def main(args=None):
         # Cleanup
         if 'ptz_node' in locals():
             ptz_node.destroy_node()
-        rclpy.shutdown()
 
 
 if __name__ == '__main__':

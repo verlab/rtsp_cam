@@ -1,44 +1,35 @@
 #!/usr/bin/env python3
 """
-Jidetech Photo Service Node
+RTSP Photo Service Node for ROS 1 Noetic
 
-This script runs the photo capture service node for Jidetech IP cameras.
+This script runs the photo capture service node for RTSP cameras.
 It provides a ROS service to capture photos from the camera.
+Optimized for Jetson Orin NX.
 """
 
 import sys
 import argparse
-import rclpy
-from rclpy.executors import MultiThreadedExecutor
+import rospy
 
-from jidetech_camera.photo_service import JidetechPhotoService
+from rtsp_cam.photo_service import RTSPPhotoService
 
 
-def main(args=None):
+def main():
     """Main function for the photo service node."""
     # Parse command line arguments
-    parser = argparse.ArgumentParser(description='Jidetech Photo Service Node')
-    parser.add_argument('--ros-args', nargs='*', help='ROS arguments')
+    parser = argparse.ArgumentParser(description='RTSP Photo Service Node for ROS 1 Noetic')
     parser.add_argument('--log-level', default='info', 
                        choices=['debug', 'info', 'warn', 'error'],
                        help='Log level')
     
-    # Parse known args (ROS 2 will handle unknown args)
-    args, unknown = parser.parse_known_args()
-    
-    # Initialize ROS 2
-    rclpy.init(args=unknown)
+    args = parser.parse_args()
     
     try:
         # Create photo service node
-        photo_node = JidetechPhotoService()
-        
-        # Create executor
-        executor = MultiThreadedExecutor()
-        executor.add_node(photo_node)
+        photo_node = RTSPPhotoService()
         
         # Spin the node
-        executor.spin()
+        rospy.spin()
         
     except KeyboardInterrupt:
         print("Photo service node interrupted by user")
@@ -48,7 +39,6 @@ def main(args=None):
         # Cleanup
         if 'photo_node' in locals():
             photo_node.destroy_node()
-        rclpy.shutdown()
 
 
 if __name__ == '__main__':
