@@ -5,7 +5,7 @@ ARG ROS_DISTRO=jazzy
 ARG UBUNTU_VERSION=24.04
 
 # Base stage with ROS 2 Jazzy
-FROM ros:${ROS_DISTRO}-ros-base-ubuntu${UBUNTU_VERSION} as base
+FROM ros:${ROS_DISTRO}-ros-base AS base
 
 # Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive
@@ -82,28 +82,44 @@ RUN apt-get update && apt-get install -y \
 
 ENV DECODER_TYPE=nvidia
 
+WORKDIR /ros2_ws
+EXPOSE 11311
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["ros2", "launch", "rtsp_cam", "rtsp_cam.launch.py"]
+
 # =================== Jetson Nano Stage ===================
 FROM base as jetson
 
-# Install Jetson-specific packages
+# Note: Jetson-specific packages are only available when running on actual Jetson hardware
+# with NVIDIA's L4T repositories. For cross-compilation or building on x86, we skip these
+# packages and rely on runtime volume mounts for Tegra libraries.
+
+# Install available GStreamer plugins that work across platforms
 RUN apt-get update && apt-get install -y \
-    nvidia-l4t-gstreamer \
-    gstreamer1.0-nvv4l2 \
+    gstreamer1.0-plugins-base \
+    gstreamer1.0-plugins-good \
+    gstreamer1.0-plugins-bad \
+    gstreamer1.0-plugins-ugly \
     && rm -rf /var/lib/apt/lists/*
 
+# Try to install Jetson-specific packages if available (will fail silently if not on Jetson)
+RUN apt-get update && \
+    (apt-get install -y nvidia-l4t-gstreamer gstreamer1.0-nvv4l2 || true) && \
+    rm -rf /var/lib/apt/lists/*
+
 ENV DECODER_TYPE=jetson
+
+WORKDIR /ros2_ws
+EXPOSE 11311
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["ros2", "launch", "rtsp_cam", "rtsp_cam.launch.py"]
 
 # =================== CPU-only Stage ===================
 FROM base as cpu
 
 ENV DECODER_TYPE=software
 
-# =================== Final stage selection ===================
-FROM ${TARGET_PLATFORM:-cpu} as final
-
 WORKDIR /ros2_ws
-
 EXPOSE 11311
-
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["ros2", "launch", "rtsp_cam", "rtsp_cam.launch.py"]

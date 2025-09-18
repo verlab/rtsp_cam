@@ -7,7 +7,7 @@
 #   docker compose --profile jetson up     # Jetson Nano  
 #   docker compose --profile dev up        # Development
 
-version: '3.8'
+# version: '3.8'  # Version is obsolete in modern Docker Compose
 
 services:
   # CPU Profile
@@ -29,6 +29,7 @@ services:
     volumes:
       - ../config/rtsp_cam_config.yaml:/ros2_ws/src/rtsp_cam/config/rtsp_cam_config.yaml:ro
       - ${PHOTO_DIR:-/tmp/rtsp_cam_photos}:/tmp/rtsp_cam_photos
+    command: ["ros2", "launch", "rtsp_cam", "rtsp_cam.launch.py"]
     profiles:
       - cpu
 
@@ -54,10 +55,12 @@ services:
     volumes:
       - ../config/rtsp_cam_config.yaml:/ros2_ws/src/rtsp_cam/config/rtsp_cam_config.yaml:ro
       - ${PHOTO_DIR:-/tmp/rtsp_cam_photos}:/tmp/rtsp_cam_photos
+    command: ["ros2", "launch", "rtsp_cam", "rtsp_cam.launch.py"]
     profiles:
       - nvidia
 
   # Jetson Nano Profile
+  # Note: Build this image on Jetson hardware for full L4T package support
   rtsp-cam-jetson:
     build:
       context: ..
@@ -84,6 +87,7 @@ services:
       - /dev/nvmap
       - /dev/nvhost-gpu
       - /dev/nvhost-as-gpu
+    command: ["ros2", "launch", "rtsp_cam", "rtsp_cam.launch.py"]
     profiles:
       - jetson
 

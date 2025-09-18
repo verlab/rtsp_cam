@@ -4,10 +4,14 @@ This directory contains Docker files for deploying the RTSP Camera ROS 2 package
 
 ## Supported Configurations
 
-- **CPU**: Software decoding using `avdec_h264/h265`
-- **NVIDIA GPU**: Hardware decoding using `nvh264dec/nvh265dec`
-- **Jetson Nano**: Hardware decoding using `nvv4l2decoder`
-- **Development**: Interactive development environment
+The RTSP camera service automatically detects and adapts to your hardware:
+
+- **CPU**: Software decoding using `avdec_h264/h265` - works on any hardware
+- **NVIDIA GPU**: Hardware decoding using `nvh264dec/nvh265dec` - optimized for NVIDIA GPUs
+- **Jetson Nano**: Hardware decoding using `nvv4l2decoder` - optimized for Jetson hardware
+- **Development**: Interactive development environment for testing
+
+Each configuration builds the same ROS service with hardware-specific optimizations.
 
 ## Quick Start
 
@@ -15,24 +19,31 @@ The Docker Compose configuration uses profiles to handle different hardware plat
 
 ### CPU-only deployment
 ```bash
+# Starts automatically with: ros2 launch rtsp_cam rtsp_cam.launch.py
 docker compose --profile cpu up -d
 ```
 
 ### NVIDIA GPU deployment
 ```bash
 # Requires nvidia-docker2
+# Starts automatically with: ros2 launch rtsp_cam rtsp_cam.launch.py
 docker compose --profile nvidia up -d
 ```
 
 ### Jetson Nano deployment
 ```bash
+# Starts automatically with: ros2 launch rtsp_cam rtsp_cam.launch.py
 docker compose --profile jetson up -d
 ```
 
 ### Development mode
 ```bash
+# Starts with interactive bash shell for development
 docker compose --profile dev up -d
 docker exec -it rtsp_cam_dev bash
+
+# Inside the container, manually run:
+# ros2 launch rtsp_cam rtsp_cam.launch.py
 ```
 
 ## Configuration
@@ -101,6 +112,7 @@ docker compose --profile nvidia build
 - `ROS_DOMAIN_ID`: ROS 2 domain ID (default: 0)
 - `PHOTO_DIR`: Photo storage directory (default: `/tmp/rtsp_cam_photos`)
 - `ROS_DISTRO`: ROS 2 distribution (default: jazzy)
+- `UBUNTU_VERSION`: Ubuntu base version (default: 22.04)
 
 ### Platform-Specific Variables
 - `DECODER_TYPE`: Decoder type (software, nvidia, jetson)
@@ -126,6 +138,20 @@ The containerized service exposes the same ROS 2 interface across all platforms:
 ### Services
 - `/camera/take_photo` - Photo capture service
 
+## Service Management
+
+### Monitor running services
+```bash
+# Check service status
+docker compose --profile cpu ps
+
+# View logs
+docker compose --profile cpu logs -f
+
+# Stop services
+docker compose --profile cpu down
+```
+
 ## Testing
 
 Test camera connectivity from host system:
@@ -148,6 +174,19 @@ ros2 service call /camera/take_photo std_srvs/srv/Trigger
 ```bash
 # Verify nvidia-docker2 installation
 docker run --rm --gpus all nvidia/cuda:11.0-base nvidia-smi
+```
+
+**Jetson packages not found during build:**
+```bash
+# This happens when building on non-Jetson hardware (x86/AMD64)
+# The image will still work, but you need to build on actual Jetson hardware
+# for full L4T package support, or use the CPU profile instead
+
+# Workaround: Build on Jetson hardware
+docker compose --profile jetson build
+
+# Alternative: Use CPU profile for cross-platform compatibility
+docker compose --profile cpu up -d
 ```
 
 **Jetson devices not accessible:**
