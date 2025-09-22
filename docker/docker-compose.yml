@@ -35,4 +35,4 @@ services:
       - /dev/nvhost-ctrl-vi
     ipc: host
     privileged: true
-    command: ["roslaunch", "rtsp_cam", "rtsp_cam.launch"]
+    command: ["bash", "-c", "source /opt/ros/noetic/setup.bash && if [ -f /catkin_ws/devel/setup.bash ]; then source /catkin_ws/devel/setup.bash; else echo 'Warning: /catkin_ws/devel/setup.bash not found, using ROS only'; fi && roslaunch rtsp_cam rtsp_cam.launch"]

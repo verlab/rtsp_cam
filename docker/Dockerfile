@@ -104,14 +104,17 @@ WORKDIR /catkin_ws
 # Copy package source
 COPY . /catkin_ws/src/rtsp_cam/
 
-# Build the package using catkin_make
-RUN /bin/bash -c "source /opt/ros/${ROS_DISTRO}/setup.bash && \
+# Install the Python package and build the workspace
+RUN /bin/bash -c "source /opt/ros/noetic/setup.bash && \
+    cd /catkin_ws/src/rtsp_cam && \
+    pip3 install -e . && \
     cd /catkin_ws && \
-    catkin_make -DCMAKE_BUILD_TYPE=Release" \
-    || echo "Catkin build completed with warnings"
+    catkin_make -DCMAKE_BUILD_TYPE=Release && \
+    echo 'Catkin workspace built successfully' && \
+    ls -la /catkin_ws/devel/"
 
 # Source the workspace
-RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> ~/.bashrc && \
+RUN echo "source /opt/ros/noetic/setup.bash" >> ~/.bashrc && \
     echo "source /catkin_ws/devel/setup.bash" >> ~/.bashrc
 
 # Set environment variables for Jetson nvv4l2decoder
@@ -119,6 +122,7 @@ ENV DECODER_TYPE=jetson
 ENV CUDA_VISIBLE_DEVICES=0
 ENV GST_PLUGIN_PATH=/usr/lib/aarch64-linux-gnu/gstreamer-1.0
 ENV LD_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu/tegra:/usr/lib/aarch64-linux-gnu:$LD_LIBRARY_PATH
+ENV PYTHONPATH=/catkin_ws/src:$PYTHONPATH
 
 # Expose ROS master port
 EXPOSE 11311
