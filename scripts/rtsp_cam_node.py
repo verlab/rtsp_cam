@@ -16,7 +16,8 @@ from rtsp_cam.camera_streamer import RTSPCameraNode
 
 def main():
     """Main function for the camera node."""
-    # Parse command line arguments
+    # Parse remaining arguments (filter out ROS args)
+    non_ros_args = rospy.myargv(argv=sys.argv)
     parser = argparse.ArgumentParser(description='RTSP Camera Node for ROS 1 Noetic')
     parser.add_argument('--sub-stream', action='store_true', 
                        help='Run as secondary stream node')
@@ -24,7 +25,7 @@ def main():
                        choices=['debug', 'info', 'warn', 'error'],
                        help='Log level')
     
-    args = parser.parse_args()
+    args = parser.parse_args(non_ros_args[1:])
     
     # Determine stream type
     stream_type = "sub" if args.sub_stream else "main"

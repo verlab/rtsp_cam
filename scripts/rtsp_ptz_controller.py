@@ -16,13 +16,14 @@ from rtsp_cam.ptz_controller import RTSPCameraPTZNode
 
 def main():
     """Main function for the PTZ controller node."""
-    # Parse command line arguments
+    # Parse remaining arguments (filter out ROS args)
+    non_ros_args = rospy.myargv(argv=sys.argv)
     parser = argparse.ArgumentParser(description='RTSP Camera PTZ Controller Node for ROS 1 Noetic')
     parser.add_argument('--log-level', default='info', 
                        choices=['debug', 'info', 'warn', 'error'],
                        help='Log level')
     
-    args = parser.parse_args()
+    args = parser.parse_args(non_ros_args[1:])
     
     try:
         # Create PTZ controller node

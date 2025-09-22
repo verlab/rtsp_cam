@@ -23,10 +23,9 @@ RUN apt-get update && apt-get install -y \
     software-properties-common \
     apt-transport-https \
     ca-certificates \
-    python3-pip \
-    python3-opencv \
-    python3-dev \
-    python3-setuptools \
+           python3-pip \
+           python3-dev \
+           python3-setuptools \
     python3-numpy \
     python3-requests \
     python3-gi \
@@ -43,10 +42,16 @@ RUN apt-get update && apt-get install -y \
     gstreamer1.0-plugins-bad \
     gstreamer1.0-plugins-ugly \
     gstreamer1.0-libav \
+    libffi-dev \
     git \
     build-essential \
     cmake \
     && rm -rf /var/lib/apt/lists/*
+
+# Create libffi.so.8 symlink if needed (for OpenCV compatibility)
+RUN if [ ! -f /usr/lib/aarch64-linux-gnu/libffi.so.8 ]; then \
+    find /usr/lib/aarch64-linux-gnu -name "libffi.so.*" -exec ln -sf {} /usr/lib/aarch64-linux-gnu/libffi.so.8 \; ; \
+    fi
 
 # Install Jetson-specific GStreamer packages for nvv4l2decoder
 # These are usually pre-installed in L4T but ensure they're available
@@ -78,18 +83,17 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Install cv-bridge and image-transport separately (these can be problematic)
+# Install image-transport, camera-info-manager and cv-bridge
 RUN apt-get update && apt-get install -y \
     ros-noetic-cv-bridge \
     ros-noetic-image-transport \
     ros-noetic-camera-info-manager \
-    || pip3 install --no-cache-dir opencv-python cv-bridge \
     && rm -rf /var/lib/apt/lists/*
 
 # Initialize rosdep
 RUN rosdep init && rosdep update || echo "rosdep already initialized"
 
-# Install additional Python dependencies
+# Install additional Python dependencies (avoid opencv-python - use Jetson's)
 RUN pip3 install --no-cache-dir \
     requests \
     numpy \
@@ -117,12 +121,13 @@ RUN /bin/bash -c "source /opt/ros/noetic/setup.bash && \
 RUN echo "source /opt/ros/noetic/setup.bash" >> ~/.bashrc && \
     echo "source /catkin_ws/devel/setup.bash" >> ~/.bashrc
 
-# Set environment variables for Jetson nvv4l2decoder
+# Set environment variables for Jetson nvv4l2decoder and OpenCV
 ENV DECODER_TYPE=jetson
 ENV CUDA_VISIBLE_DEVICES=0
 ENV GST_PLUGIN_PATH=/usr/lib/aarch64-linux-gnu/gstreamer-1.0
-ENV LD_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu/tegra:/usr/lib/aarch64-linux-gnu:$LD_LIBRARY_PATH
-ENV PYTHONPATH=/catkin_ws/src:$PYTHONPATH
+ENV LD_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu/tegra:/usr/lib/aarch64-linux-gnu:/usr/local/lib:$LD_LIBRARY_PATH
+ENV PYTHONPATH=/catkin_ws/src:/usr/lib/python3/dist-packages:$PYTHONPATH
+ENV OPENCV_LOG_LEVEL=ERROR
 
 # Expose ROS master port
 EXPOSE 11311
