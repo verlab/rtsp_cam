@@ -9,37 +9,41 @@ This launch file starts the main camera node, PTZ controller, and photo service
   <arg name="camera_config" default="$(find rtsp_cam)/config/rtsp_cam_config.yaml" />
   <arg name="use_sim_time" default="false" />
   <arg name="main_stream_enabled" default="true" />
-  <arg name="sub_stream_enabled" default="false" />
+  <arg name="sub_stream_enabled" default="true" />
   <arg name="ptz_enabled" default="true" />
   <arg name="photo_enabled" default="true" />
+  <arg name="decoder_type" default="jetson" />
   
   <!-- Load parameters -->
   <rosparam file="$(arg camera_config)" command="load" />
   <param name="use_sim_time" value="$(arg use_sim_time)" />
+  <param name="decoder_type" value="$(arg decoder_type)" />
   
   <!-- Main camera node -->
   <node pkg="rtsp_cam" type="rtsp_cam_node.py" name="rtsp_cam_main_node" output="screen" if="$(arg main_stream_enabled)">
+    <rosparam file="$(arg camera_config)" command="load" />
     <remap from="image_raw" to="camera/main/image_raw" />
     <remap from="camera_info" to="camera/main/camera_info" />
   </node>
   
   <!-- Secondary stream node -->
   <node pkg="rtsp_cam" type="rtsp_cam_node.py" name="rtsp_cam_sub_node" output="screen" if="$(arg sub_stream_enabled)">
+    <rosparam file="$(arg camera_config)" command="load" />
     <remap from="image_raw" to="camera/sub/image_raw" />
     <remap from="camera_info" to="camera/sub/camera_info" />
     <param name="stream_type" value="sub" />
   </node>
   
   <!-- PTZ controller node -->
-  <node pkg="rtsp_cam" type="rtsp_ptz_controller.py" name="rtsp_ptz_controller" output="screen" if="$(arg ptz_enabled)">
+  <!-- <node pkg="rtsp_cam" type="rtsp_ptz_controller.py" name="rtsp_ptz_controller" output="screen" if="$(arg ptz_enabled)">
     <remap from="ptz_status" to="camera/ptz_status" />
     <remap from="ptz_cmd" to="camera/ptz_cmd" />
     <remap from="joint_states" to="camera/joint_states" />
-  </node>
+  </node> -->
   
   <!-- Photo service node -->
-  <node pkg="rtsp_cam" type="rtsp_photo_service.py" name="rtsp_photo_service" output="screen" if="$(arg photo_enabled)">
+  <!-- <node pkg="rtsp_cam" type="rtsp_photo_service.py" name="rtsp_photo_service" output="screen" if="$(arg photo_enabled)">
     <remap from="take_photo" to="camera/take_photo" />
-  </node>
+  </node> -->
   
 </launch> 

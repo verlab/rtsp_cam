@@ -6,7 +6,7 @@ This module provides RTSP streaming functionality using GStreamer for optimal pe
 It supports both main and secondary streams with H.264/H.265 encoding and multiple decoder options.
 """
 
-import cv2
+# OpenCV not needed for pure GStreamer streaming
 import numpy as np
 import gi
 import threading
@@ -21,7 +21,6 @@ from gi.repository import Gst, GstApp, GLib
 # ROS 1 imports
 import rospy
 from sensor_msgs.msg import Image, CameraInfo
-from cv_bridge import CvBridge
 
 
 class RTSPCameraStreamer:
@@ -51,7 +50,6 @@ class RTSPCameraStreamer:
         self.is_running = False
         self.current_frame = None
         self.frame_lock = threading.Lock()
-        self.bridge = CvBridge()
         
         # Initialize GStreamer
         Gst.init(None)
@@ -72,9 +70,33 @@ class RTSPCameraStreamer:
         else:
             pipeline_str = self._build_pipeline()
         
-        # Create pipeline
-        self.pipeline = Gst.parse_launch(pipeline_str)
-        self.appsink = self.pipeline.get_by_name("appsink")
+        try:
+            # Create pipeline
+            self.pipeline = Gst.parse_launch(pipeline_str)
+            self.appsink = self.pipeline.get_by_name("appsink")
+        except Exception as e:
+            print(f"Failed to create pipeline with {self.decoder_type} decoder: {str(e)}")
+            # Try different fallback approaches
+            if self.decoder_type != "software":
+                print(f"Falling back to software decoder...")
+                self.decoder_type = "software"
+                pipeline_str = self._build_pipeline()
+                try:
+                    self.pipeline = Gst.parse_launch(pipeline_str)
+                    self.appsink = self.pipeline.get_by_name("appsink")
+                except Exception as e2:
+                    print(f"Software decoder also failed: {str(e2)}")
+                    # Try minimal pipeline without decoder (for testing)
+                    print("Trying minimal pipeline for debugging...")
+                    pipeline_str = self._build_minimal_pipeline()
+                    self.pipeline = Gst.parse_launch(pipeline_str)
+                    self.appsink = self.pipeline.get_by_name("appsink")
+            else:
+                # Try minimal pipeline as last resort
+                print("Trying minimal pipeline for debugging...")
+                pipeline_str = self._build_minimal_pipeline()
+                self.pipeline = Gst.parse_launch(pipeline_str)
+                self.appsink = self.pipeline.get_by_name("appsink")
         
         # Configure appsink
         self.appsink.set_property("emit-signals", True)
@@ -84,36 +106,79 @@ class RTSPCameraStreamer:
         # Connect signal
         self.appsink.connect("new-sample", self._on_new_sample, None)
             
+    def _check_decoder_availability(self, decoder_name):
+        """Check if a specific decoder is available."""
+        try:
+            # Try to create the decoder element
+            decoder_element = Gst.ElementFactory.make(decoder_name, None)
+            if decoder_element is not None:
+                return True
+        except Exception:
+            pass
+        return False
+
     def _build_pipeline(self) -> str:
         """Build GStreamer pipeline based on decoder type and encoding."""
-        # Determine decoder elements based on type
-        if self.decoder_type == "nvidia":
-            h264_decoder = "nvh264dec"
-            h265_decoder = "nvh265dec"
-        elif self.decoder_type == "jetson":
-            h264_decoder = "nvv4l2decoder"
-            h265_decoder = "nvv4l2decoder"
+        # For Jetson, try hardware decoder with fallback to software
+        if self.decoder_type == "jetson":
+            # Check if Jetson decoders are available
+            if self._check_decoder_availability("nvv4l2decoder"):
+                h264_decoder_chain = "nvv4l2decoder ! nvvidconv ! videoconvert"
+                h265_decoder_chain = "nvv4l2decoder ! nvvidconv ! videoconvert"
+                print("Using Jetson hardware decoder (nvv4l2decoder)")
+            else:
+                print("Jetson hardware decoder not available, using software decoder")
+                h264_decoder_chain = "avdec_h264 ! videoconvert"
+                h265_decoder_chain = "avdec_h265 ! videoconvert"
+        elif self.decoder_type == "nvidia":
+            # Check if NVIDIA GPU decoders are available
+            if self._check_decoder_availability("nvh264dec"):
+                h264_decoder_chain = "nvh264dec ! videoconvert"
+                h265_decoder_chain = "nvh265dec ! videoconvert"
+                print("Using NVIDIA GPU decoder (nvh264dec)")
+            else:
+                print("NVIDIA GPU decoder not available, using software decoder")
+                h264_decoder_chain = "avdec_h264 ! videoconvert"
+                h265_decoder_chain = "avdec_h265 ! videoconvert"
         elif self.decoder_type == "vaapi":
-            h264_decoder = "vaapih264dec"
-            h265_decoder = "vaapih265dec"
+            # Check if VA-API decoders are available
+            if self._check_decoder_availability("vaapih264dec"):
+                h264_decoder_chain = "vaapih264dec ! videoconvert"
+                h265_decoder_chain = "vaapih265dec ! videoconvert"
+                print("Using VA-API decoder (vaapih264dec)")
+            else:
+                print("VA-API decoder not available, using software decoder")
+                h264_decoder_chain = "avdec_h264 ! videoconvert"
+                h265_decoder_chain = "avdec_h265 ! videoconvert"
         else:  # software
-            h264_decoder = "avdec_h264"
-            h265_decoder = "avdec_h265"
+            h264_decoder_chain = "avdec_h264 ! videoconvert"
+            h265_decoder_chain = "avdec_h265 ! videoconvert"
+            print("Using software decoder (avdec_h264)")
         
         # Create pipeline string based on encoding
         if "h265" in self.rtsp_url.lower():
             pipeline_str = (
                 f"rtspsrc location={self.rtsp_url} latency=0 drop-on-latency=true ! "
-                f"rtph265depay ! h265parse ! {h265_decoder} ! "
-                "videoconvert ! video/x-raw,format=BGR ! appsink name=appsink"
+                f"rtph265depay ! h265parse ! {h265_decoder_chain} ! "
+                "video/x-raw,format=BGR ! appsink name=appsink"
             )
         else:  # Default to H.264
             pipeline_str = (
                 f"rtspsrc location={self.rtsp_url} latency=0 drop-on-latency=true ! "
-                f"rtph264depay ! h264parse ! {h264_decoder} ! "
-                "videoconvert ! video/x-raw,format=BGR ! appsink name=appsink"
+                f"rtph264depay ! h264parse ! {h264_decoder_chain} ! "
+                "video/x-raw,format=BGR ! appsink name=appsink"
             )
         
+        return pipeline_str
+
+    def _build_minimal_pipeline(self) -> str:
+        """Build minimal pipeline that bypasses decoder issues."""
+        # Simple pipeline that should work with basic GStreamer
+        pipeline_str = (
+            f"rtspsrc location={self.rtsp_url} latency=0 drop-on-latency=true ! "
+            "rtph264depay ! h264parse ! queue ! decodebin ! videoconvert ! "
+            "video/x-raw,format=BGR ! appsink name=appsink"
+        )
         return pipeline_str
         
     def _on_new_sample(self, appsink, data):
@@ -171,8 +236,8 @@ class RTSPCameraStreamer:
                 frame = frame[:, :, :3]
             else:
                 frame = buffer_array[:expected_size].reshape((height, width))
-                # Convert grayscale to BGR
-                frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
+                # Convert grayscale to BGR using numpy
+                frame = np.stack([frame, frame, frame], axis=-1)
             
             # Copy frame to avoid buffer issues
             frame_copy = frame.copy()
@@ -209,14 +274,25 @@ class RTSPCameraStreamer:
             # Set pipeline state to playing
             ret = self.pipeline.set_state(Gst.State.PLAYING)
             if ret == Gst.StateChangeReturn.FAILURE:
-                raise RuntimeError(f"Failed to start {self.stream_type} stream pipeline")
+                # Try fallback to software decoder if hardware decoder fails
+                if self.decoder_type == "jetson":
+                    print(f"Hardware decoder failed, trying software decoder...")
+                    self.decoder_type = "software"
+                    self._create_pipeline()
+                    ret = self.pipeline.set_state(Gst.State.PLAYING)
+                    if ret == Gst.StateChangeReturn.FAILURE:
+                        raise RuntimeError(f"Failed to start {self.stream_type} stream pipeline with software decoder")
+                else:
+                    raise RuntimeError(f"Failed to start {self.stream_type} stream pipeline")
             
-            # Wait for pipeline to be ready
-            ret = self.pipeline.get_state(Gst.CLOCK_TIME_NONE)
+            # Wait for pipeline to be ready (with timeout)
+            timeout_ns = 10 * 1000000000  # 10 seconds in nanoseconds
+            ret = self.pipeline.get_state(timeout_ns)
             if ret[0] != Gst.StateChangeReturn.SUCCESS:
-                raise RuntimeError(f"Failed to start {self.stream_type} stream")
+                print(f"Warning: Pipeline state change timed out or failed for {self.stream_type} stream")
+                # Don't raise an error here, allow the pipeline to continue trying
             
-            print(f"Started {self.stream_type} stream from {self.rtsp_url}")
+            print(f"Started {self.stream_type} stream from {self.rtsp_url} using {self.decoder_type} decoder")
     
     def stop(self):
         """Stop the camera stream."""
@@ -275,7 +351,6 @@ class RTSPCameraNode:
         
         self.stream_type = stream_type
         self.camera_streamer = None
-        self.bridge = CvBridge()
         
         # Declare parameters
         self._declare_parameters()
@@ -311,8 +386,13 @@ class RTSPCameraNode:
         self.sub_stream_enabled = rospy.get_param('~sub_stream_enabled', True)
         self.encoding = rospy.get_param('~encoding', 'h264')
         self.frame_rate = rospy.get_param('~frame_rate', 30)
-        self.resolution_width = rospy.get_param('~resolution_width', 1920)
-        self.resolution_height = rospy.get_param('~resolution_height', 1080)
+        # Stream-specific resolution parameters
+        if self.stream_type == "main":
+            self.resolution_width = rospy.get_param('~main_resolution_width', rospy.get_param('~resolution_width', 2560))
+            self.resolution_height = rospy.get_param('~main_resolution_height', rospy.get_param('~resolution_height', 1440))
+        else:  # sub stream
+            self.resolution_width = rospy.get_param('~sub_resolution_width', 640)
+            self.resolution_height = rospy.get_param('~sub_resolution_height', 480)
         
         # Camera info parameters
         self.camera_name = rospy.get_param('~camera_name', 'rtsp_camera')
@@ -399,7 +479,17 @@ class RTSPCameraNode:
         if hasattr(self, 'current_frame') and self.current_frame is not None:
             try:
                 # Convert frame to ROS message
-                ros_image = self.bridge.cv2_to_imgmsg(self.current_frame, "bgr8")
+                # Convert numpy array to ROS Image message manually
+                ros_image = Image()
+                if self.current_frame is not None:
+                    ros_image.height = self.current_frame.shape[0]
+                    ros_image.width = self.current_frame.shape[1]
+                    ros_image.encoding = "bgr8"
+                    ros_image.is_bigendian = False
+                    ros_image.step = self.current_frame.shape[1] * 3  # 3 bytes per pixel for BGR
+                    ros_image.data = self.current_frame.tobytes()
+                else:
+                    return  # No frame available
                 ros_image.header.stamp = rospy.Time.now()
                 ros_image.header.frame_id = self.camera_frame_id
                 
@@ -424,22 +514,22 @@ class RTSPCameraNode:
         
         # Set distortion model (you may need to calibrate your camera)
         camera_info.distortion_model = "plumb_bob"
-        camera_info.d = [0.0, 0.0, 0.0, 0.0, 0.0]
+        camera_info.D = [0.0, 0.0, 0.0, 0.0, 0.0]
         
         # Set camera matrix (example values - you should calibrate your camera)
-        camera_info.k = [
+        camera_info.K = [
             camera_info.width * 0.8, 0.0, camera_info.width / 2.0,
             0.0, camera_info.height * 0.8, camera_info.height / 2.0,
             0.0, 0.0, 1.0
         ]
         
         # Set rectification matrix (identity for monocular camera)
-        camera_info.r = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+        camera_info.R = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
         
         # Set projection matrix
-        camera_info.p = [
-            camera_info.k[0], 0.0, camera_info.k[2], 0.0,
-            0.0, camera_info.k[4], camera_info.k[5], 0.0,
+        camera_info.P = [
+            camera_info.K[0], 0.0, camera_info.K[2], 0.0,
+            0.0, camera_info.K[4], camera_info.K[5], 0.0,
             0.0, 0.0, 1.0, 0.0
         ]
         

@@ -22,8 +22,15 @@ main_stream_enabled: true
 sub_stream_enabled: true
 encoding: "h264"  # Options: "h264", "h265"
 frame_rate: 30
-resolution_width: 1920
-resolution_height: 1080
+# Main stream resolution (4M camera stream ≈ 2560x1440)
+main_resolution_width: 2560
+main_resolution_height: 1440
+# Secondary stream resolution (VGA)
+sub_resolution_width: 640
+sub_resolution_height: 480
+# Default/backward compatibility
+resolution_width: 2560
+resolution_height: 1440
 
 # Hardware decoding options: "software", "nvidia", "jetson", "vaapi"
 decoder_type: "jetson"  # Optimized for Jetson Orin NX

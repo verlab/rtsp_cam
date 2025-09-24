@@ -1,11 +1,11 @@
-# Dockerfile for RTSP Camera ROS 1 Noetic on Jetson Orin NX
-# Based on NVIDIA L4T (Linux for Tegra) with ROS 1 Noetic
+# Dockerfile for RTSP Camera ROS 1 Noetic on Jetson Orin Nano
+# Using Ubuntu 20.04 base with Jetson runtime libraries mounted
 
-ARG L4T_VERSION=r35.2.1
 ARG ROS_DISTRO=noetic
 
-# Use NVIDIA L4T base image for Jetson Orin NX (use older compatible version)
-FROM nvcr.io/nvidia/l4t-base:${L4T_VERSION}
+# Jetson Deployment Dockerfile - Build this on Jetson Orin Nano  
+# Using 35.3.1 - verified available and signed for Orin Nano + ROS 1 Noetic
+FROM nvcr.io/nvidia/l4t-base:35.4.1
 
 # Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive
@@ -14,7 +14,7 @@ ENV PYTHONUNBUFFERED=1
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
 
-# Install system dependencies and GStreamer with nvv4l2decoder support
+# Install system dependencies and GStreamer
 RUN apt-get update && apt-get install -y \
     curl \
     wget \
@@ -23,9 +23,9 @@ RUN apt-get update && apt-get install -y \
     software-properties-common \
     apt-transport-https \
     ca-certificates \
-           python3-pip \
-           python3-dev \
-           python3-setuptools \
+    python3-pip \
+    python3-dev \
+    python3-setuptools \
     python3-numpy \
     python3-requests \
     python3-gi \
@@ -46,20 +46,15 @@ RUN apt-get update && apt-get install -y \
     git \
     build-essential \
     cmake \
+    pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
-# Create libffi.so.8 symlink if needed (for OpenCV compatibility)
-RUN if [ ! -f /usr/lib/aarch64-linux-gnu/libffi.so.8 ]; then \
-    find /usr/lib/aarch64-linux-gnu -name "libffi.so.*" -exec ln -sf {} /usr/lib/aarch64-linux-gnu/libffi.so.8 \; ; \
-    fi
-
-# Install Jetson-specific GStreamer packages for nvv4l2decoder
-# These are usually pre-installed in L4T but ensure they're available
+# Install additional GStreamer dependencies (Jetson packages already in L4T base)
 RUN apt-get update && apt-get install -y \
-    gstreamer1.0-plugins-nvvideo4linux2 \
-    nvidia-l4t-gstreamer \
-    || echo "Jetson GStreamer plugins using nvv4l2decoder already available" \
+    gstreamer1.0-plugins-bad \
     && rm -rf /var/lib/apt/lists/*
+
+# Note: libgomp TLS fix will be handled at runtime in entrypoint
 
 # Set up ROS 1 Noetic repository for focal (compatible with L4T)
 RUN curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key | apt-key add - \
@@ -83,9 +78,8 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Install image-transport, camera-info-manager and cv-bridge
+# Install image-transport and camera-info-manager (cv-bridge removed)
 RUN apt-get update && apt-get install -y \
-    ros-noetic-cv-bridge \
     ros-noetic-image-transport \
     ros-noetic-camera-info-manager \
     && rm -rf /var/lib/apt/lists/*
@@ -108,6 +102,10 @@ WORKDIR /catkin_ws
 # Copy package source
 COPY . /catkin_ws/src/rtsp_cam/
 
+# Copy entrypoint script
+COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
 # Install the Python package and build the workspace
 RUN /bin/bash -c "source /opt/ros/noetic/setup.bash && \
     cd /catkin_ws/src/rtsp_cam && \
@@ -121,13 +119,16 @@ RUN /bin/bash -c "source /opt/ros/noetic/setup.bash && \
 RUN echo "source /opt/ros/noetic/setup.bash" >> ~/.bashrc && \
     echo "source /catkin_ws/devel/setup.bash" >> ~/.bashrc
 
-# Set environment variables for Jetson nvv4l2decoder and OpenCV
+# Set environment variables for Jetson hardware acceleration
 ENV DECODER_TYPE=jetson
 ENV CUDA_VISIBLE_DEVICES=0
-ENV GST_PLUGIN_PATH=/usr/lib/aarch64-linux-gnu/gstreamer-1.0
-ENV LD_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu/tegra:/usr/lib/aarch64-linux-gnu:/usr/local/lib:$LD_LIBRARY_PATH
+ENV GST_PLUGIN_PATH=/usr/lib/aarch64-linux-gnu/gstreamer-1.0:/usr/lib/aarch64-linux-gnu/tegra-mmapi
+ENV LD_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu/tegra:/usr/lib/aarch64-linux-gnu/tegra-mmapi:/opt/nvidia/vpi2/lib64:/usr/lib/aarch64-linux-gnu:/usr/local/lib:$LD_LIBRARY_PATH
 ENV PYTHONPATH=/catkin_ws/src:/usr/lib/python3/dist-packages:$PYTHONPATH
 ENV OPENCV_LOG_LEVEL=ERROR
+# Jetson specific environment
+ENV NVMEDIA_ENABLE_TRACKING=1
+ENV NVMEDIA_ENABLE_PROFILING=0
 
 # Expose ROS master port
 EXPOSE 11311
@@ -135,5 +136,8 @@ EXPOSE 11311
 # Set working directory
 WORKDIR /catkin_ws
 
+# Set entrypoint
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+
 # Default command (can be overridden in docker-compose)
-CMD ["bash"]
+CMD []

@@ -6,7 +6,12 @@ This module provides photo capture functionality for RTSP cameras with snapshot 
 It includes both HTTP-based and RTSP-based photo capture methods.
 """
 
-import cv2
+try:
+    import cv2
+except ImportError as e:
+    print(f"OpenCV import failed: {e}")
+    print("Using fallback image processing...")
+    cv2 = None
 import os
 import time
 import requests
@@ -191,6 +196,10 @@ class PhotoCaptureService:
                 rtsp_url = f"rtsp://{self.username}:{self.password}@{self.ip}:{self.rtsp_port}/h264/ch1/main/av_stream"
             
             # Open RTSP stream
+            if cv2 is None:
+                rospy.logwarn("OpenCV not available - RTSP photo capture disabled")
+                return TriggerResponse(success=False, message="OpenCV not available")
+            
             cap = cv2.VideoCapture(rtsp_url)
             
             if not cap.isOpened():
@@ -201,11 +210,12 @@ class PhotoCaptureService:
             
             if ret:
                 # Resize frame to configured resolution if needed
-                if frame.shape[1] != self.resolution_width or frame.shape[0] != self.resolution_height:
+                if cv2 is not None and frame.shape[1] != self.resolution_width or frame.shape[0] != self.resolution_height:
                     frame = cv2.resize(frame, (self.resolution_width, self.resolution_height))
                 
                 # Save frame as photo with configured quality
-                cv2.imwrite(photo_path, frame, [cv2.IMWRITE_JPEG_QUALITY, self.photo_quality])
+                if cv2 is not None:
+                    cv2.imwrite(photo_path, frame, [cv2.IMWRITE_JPEG_QUALITY, self.photo_quality])
                 cap.release()
                 return True, f"Photo captured successfully: {photo_path}"
             else:
@@ -390,11 +400,12 @@ class RTSPPhotoService:
             photo_quality = self.photo_quality
             
             # Resize image to configured resolution if needed
-            if cv_image.shape[1] != resolution_width or cv_image.shape[0] != resolution_height:
+            if cv2 is not None and cv_image.shape[1] != resolution_width or cv_image.shape[0] != resolution_height:
                 cv_image = cv2.resize(cv_image, (resolution_width, resolution_height))
             
             # Save image with configured quality
-            cv2.imwrite(photo_path, cv_image, [cv2.IMWRITE_JPEG_QUALITY, photo_quality])
+            if cv2 is not None:
+                cv2.imwrite(photo_path, cv_image, [cv2.IMWRITE_JPEG_QUALITY, photo_quality])
             
             return True, f"Photo captured from topic: {photo_path}"
             

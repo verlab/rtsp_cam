@@ -12,18 +12,21 @@ services:
     container_name: rtsp_cam_jetson
     restart: unless-stopped
     network_mode: host
+    runtime: nvidia
     environment:
       - ROS_MASTER_URI=http://localhost:11311
       - ROS_HOSTNAME=localhost
       - DECODER_TYPE=jetson
       - CUDA_VISIBLE_DEVICES=0
-      - GST_PLUGIN_PATH=/usr/lib/aarch64-linux-gnu/gstreamer-1.0
-      - LD_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu/tegra:/usr/lib/aarch64-linux-gnu:$LD_LIBRARY_PATH
+      - GST_PLUGIN_PATH=/usr/lib/aarch64-linux-gnu/gstreamer-1.0:/usr/lib/aarch64-linux-gnu/tegra-mmapi
+      - LD_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu/tegra:/usr/lib/aarch64-linux-gnu/tegra-mmapi:/opt/nvidia/vpi2/lib64:/usr/lib/aarch64-linux-gnu:/usr/local/lib
+      - NVMEDIA_ENABLE_TRACKING=1
+      - NVMEDIA_ENABLE_PROFILING=0
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
     volumes:
       - ../config/rtsp_cam_config.yaml:/catkin_ws/src/rtsp_cam/config/rtsp_cam_config.yaml:ro
       - ${PHOTO_DIR:-/tmp/rtsp_cam_photos}:/tmp/rtsp_cam_photos
-      - /usr/lib/aarch64-linux-gnu/tegra:/usr/lib/aarch64-linux-gnu/tegra:ro
-      - /usr/lib/aarch64-linux-gnu/gstreamer-1.0:/usr/lib/aarch64-linux-gnu/gstreamer-1.0:ro
     devices:
       - /dev/nvhost-ctrl
       - /dev/nvhost-ctrl-gpu
@@ -33,6 +36,9 @@ services:
       - /dev/nvhost-as-gpu
       - /dev/nvhost-ctrl-isp
       - /dev/nvhost-ctrl-vi
+      - /dev/tegra_dc_ctrl
+      - /dev/tegra_dc_0
+      - /dev/tegra_dc_1
     ipc: host
     privileged: true
-    command: ["bash", "-c", "source /opt/ros/noetic/setup.bash && if [ -f /catkin_ws/devel/setup.bash ]; then source /catkin_ws/devel/setup.bash; else echo 'Warning: /catkin_ws/devel/setup.bash not found, using ROS only'; fi && roslaunch rtsp_cam rtsp_cam.launch"]
+    command: ["roslaunch", "rtsp_cam", "rtsp_cam.launch"]

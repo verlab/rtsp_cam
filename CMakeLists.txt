@@ -11,14 +11,13 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   std_srvs
   geometry_msgs
-  cv_bridge
   image_transport
   camera_info_manager
   message_generation
 )
 
 ## System dependencies are found with CMake's conventions
-find_package(OpenCV REQUIRED)
+# OpenCV not needed for pure GStreamer streaming
 
 ###################################
 ## catkin specific configuration ##
@@ -26,8 +25,8 @@ find_package(OpenCV REQUIRED)
 catkin_package(
   INCLUDE_DIRS
   LIBRARIES
-  CATKIN_DEPENDS rospy sensor_msgs std_msgs std_srvs geometry_msgs cv_bridge image_transport camera_info_manager message_runtime
-  DEPENDS OpenCV
+  CATKIN_DEPENDS rospy sensor_msgs std_msgs std_srvs geometry_msgs image_transport camera_info_manager message_runtime
+  DEPENDS
 )
 
 ###########
@@ -37,7 +36,6 @@ catkin_package(
 ## Specify additional locations of header files
 include_directories(
   ${catkin_INCLUDE_DIRS}
-  ${OpenCV_INCLUDE_DIRS}
 )
 
 #############
