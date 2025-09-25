@@ -35,5 +35,53 @@ fi
 mkdir -p /dev/shm
 echo "Shared memory directory: /dev/shm"
 
-# Execute main command
-exec "$@"
+# Check if config file exists
+if [ -f "/app/config/cameras.json" ]; then
+    echo "✓ Config file found: /app/config/cameras.json"
+else
+    echo "✗ Config file missing: /app/config/cameras.json"
+fi
+
+# List available files for debugging
+echo "Available files in /app:"
+ls -la /app/
+
+echo "Starting main application..."
+
+# Debug: Show what command will be executed
+echo "Command to execute: $@"
+echo "First argument: $1"
+echo "All arguments: $*"
+
+# Test if Python script exists and is executable
+if [ -f "/app/rtsp_streamer_node.py" ]; then
+    echo "✓ Python script found: /app/rtsp_streamer_node.py"
+    echo "File permissions:"
+    ls -la /app/rtsp_streamer_node.py
+else
+    echo "✗ Python script NOT found: /app/rtsp_streamer_node.py"
+fi
+
+# Test Python directly
+echo "Testing Python:"
+python3 --version
+which python3
+
+# Execute main command with error handling and output
+echo "Executing: $@"
+
+# Set Python unbuffered output
+export PYTHONUNBUFFERED=1
+
+# Try to run the command and capture any errors
+if ! "$@"; then
+    echo "ERROR: Command failed with exit code $?"
+    echo "Trying to run with explicit error output..."
+    python3 -u rtsp_streamer_node.py 2>&1 || {
+        echo "Python script failed. Checking for syntax errors..."
+        python3 -m py_compile rtsp_streamer_node.py
+        echo "Trying to import the module..."
+        python3 -c "import rtsp_streamer_node" 2>&1
+    }
+    exit 1
+fi

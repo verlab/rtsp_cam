@@ -17,6 +17,9 @@ import signal
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
+# Global variable for signal handler
+server_instance = None
+
 class OptimizedSharedMemoryWriter:
     """Direct shared memory writer optimized for minimal latency"""
     
@@ -106,12 +109,16 @@ class OptimizedGStreamerStream:
         if self.username and self.password:
             self.rtsp_url = self._build_authenticated_url()
         
-        # Optimized shared memory writer
+        # Optimized shared memory writer with actual dimensions
+        actual_width = width if width > 0 else 1920
+        actual_height = height if height > 0 else 1080
         self.shm_writer = OptimizedSharedMemoryWriter(
             name, 
-            max_width=max(width, 2560), 
-            max_height=max(height, 1440)
+            max_width=actual_width, 
+            max_height=actual_height
         )
+        
+        print(f"Created shared memory for {name}: {actual_width}x{actual_height} (max_frame_size: {actual_width * actual_height * 3} bytes)")
     
     def _build_authenticated_url(self) -> str:
         """Build RTSP URL with authentication"""
@@ -144,81 +151,32 @@ class OptimizedGStreamerStream:
     def _build_gstreamer_command(self) -> List[str]:
         """Build optimized GStreamer command for subprocess"""
         
-        cmd = ['gst-launch-1.0', '-q']
-        
-        # Build pipeline parts
-        pipeline_parts = []
-        
-        # RTSP source with low latency settings
-        pipeline_parts.append(f"rtspsrc location={self.rtsp_url} latency=0 buffer-mode=auto protocols=tcp")
-        
-        # RTP depayloader
-        pipeline_parts.append("rtph264depay")
-        
-        # H264 parser (crucial for Jetson hardware decoder)
-        pipeline_parts.append("h264parse")
-        
-        # Hardware decoder selection
-        if self.use_nvdec:
-            if self._check_element_availability("nvv4l2decoder"):
-                pipeline_parts.append("nvv4l2decoder")
-                print(f"Using nvv4l2decoder for {self.name}")
-            elif self._check_element_availability("nvh264dec"):
-                pipeline_parts.append("nvh264dec")
-                print(f"Using nvh264dec for {self.name}")
-            else:
-                print(f"WARNING: No hardware decoder found for {self.name}, using software")
-                pipeline_parts.append("avdec_h264")
-        else:
-            pipeline_parts.append("avdec_h264")
-        
-        # Color conversion and scaling
-        if self.use_nvdec and self._check_element_availability("nvvidconv"):
-            # Use nvvidconv for hardware acceleration
-            if self.width > 0 and self.height > 0:
-                pipeline_parts.extend([
-                    "nvvidconv",
-                    f"video/x-raw(memory:NVMM),width={self.width},height={self.height}",
-                    "nvvidconv",
-                    "video/x-raw,format=BGR"
-                ])
-            else:
-                pipeline_parts.extend([
-                    "nvvidconv", 
-                    "video/x-raw,format=BGR"
-                ])
-        else:
-            # Software fallback
-            if self.width > 0 and self.height > 0:
-                pipeline_parts.extend([
-                    "videoscale", 
-                    "videoconvert", 
-                    f"video/x-raw,width={self.width},height={self.height},format=BGR"
-                ])
-            else:
-                pipeline_parts.extend([
-                    "videoconvert", 
-                    "video/x-raw,format=BGR"
-                ])
-        
-        # Output to stdout for reading
-        pipeline_parts.append("fdsink fd=1")
-        
-        # Join pipeline and add to command
-        pipeline_str = " ! ".join(pipeline_parts)
-        cmd.append(pipeline_str)
+        # Build command exactly like your working command format
+        cmd = [
+            'gst-launch-1.0', '-q',
+            'rtspsrc', f'location={self.rtsp_url}', 'latency=0',
+            '!', 'rtph264depay',
+            '!', 'h264parse',
+            '!', 'nvv4l2decoder',
+            '!', 'nvvidconv',
+            '!', f'video/x-raw,width={self.width},height={self.height},format=BGR',
+            '!', 'fdsink', 'fd=1'
+        ]
         
         return cmd
     
     def _test_pipeline(self) -> bool:
         """Test if the pipeline works before starting frame reading"""
         try:
-            # Build a test command that just connects and exits after 5 seconds  
-            cmd = ['gst-launch-1.0', '-q']
-            
-            # Use a simpler test pipeline first
-            test_pipeline = f"rtspsrc location={self.rtsp_url} latency=0 protocols=tcp ! rtph264depay ! h264parse ! nvv4l2decoder ! fakesink"
-            cmd.append(test_pipeline)
+            # Build a test command exactly like your working command
+            cmd = [
+                'gst-launch-1.0', '-q',
+                'rtspsrc', f'location={self.rtsp_url}', 'latency=0',
+                '!', 'rtph264depay',
+                '!', 'h264parse', 
+                '!', 'nvv4l2decoder',
+                '!', 'fakesink'
+            ]
             
             print(f"Testing basic pipeline for {self.name}: {' '.join(cmd)}")
             
@@ -374,9 +332,31 @@ class OptimizedStreamServer:
     """Optimized stream server with minimal latency for multiple camera streams"""
     
     def __init__(self, config_file: str):
+        print(f"OptimizedStreamServer init: config_file={config_file}")
         self.config_file = config_file
         self.streams: Dict[str, OptimizedGStreamerStream] = {}
+        
+        # Clean up any leftover shared memory files
+        self._cleanup_leftover_shm()
+        
+        print("Loading configuration...")
         self.load_config()
+        print(f"Configuration loaded successfully. Found {len(self.config)} cameras.")
+    
+    def _cleanup_leftover_shm(self):
+        """Clean up any leftover shared memory files from previous runs"""
+        try:
+            shm_dir = Path("/dev/shm")
+            if shm_dir.exists():
+                # Remove any files matching our pattern
+                for shm_file in shm_dir.glob("rtsp_frames_*"):
+                    try:
+                        shm_file.unlink()
+                        print(f"Cleaned up leftover shared memory: {shm_file}")
+                    except Exception as e:
+                        print(f"Warning: Could not remove {shm_file}: {e}")
+        except Exception as e:
+            print(f"Warning: Error during shared memory cleanup: {e}")
     
     def load_config(self):
         """Load camera configuration"""
@@ -506,16 +486,59 @@ class OptimizedStreamServer:
             stream.stop()
         print("All streams stopped.")
 
+def cleanup_handler(signum, frame):
+    """Handle shutdown signals for cleanup"""
+    print(f"\nReceived signal {signum}, shutting down gracefully...")
+    global server_instance
+    if server_instance:
+        server_instance.stop()
+    sys.exit(0)
+
 def main():
     """Main entry point"""
+    global server_instance
+    
+    print("=== RTSP Streamer Node Starting ===")
+    print(f"Python executable: {sys.executable}")
+    print(f"Python version: {sys.version}")
+    print(f"Working directory: {os.getcwd()}")
+    print(f"Script location: {__file__}")
+    
     config_file = os.environ.get('CONFIG_FILE', '/app/config/cameras.json')
+    print(f"Config file path: {config_file}")
     
     if not os.path.exists(config_file):
         print(f"Configuration file not found: {config_file}")
+        print(f"Available files in /app:")
+        if os.path.exists('/app'):
+            for item in os.listdir('/app'):
+                print(f"  {item}")
         sys.exit(1)
     
-    server = OptimizedStreamServer(config_file)
-    server.run()
+    # Setup signal handlers for graceful shutdown
+    signal.signal(signal.SIGINT, cleanup_handler)
+    signal.signal(signal.SIGTERM, cleanup_handler)
+    
+    print("Creating OptimizedStreamServer...")
+    server_instance = OptimizedStreamServer(config_file)
+    print("Starting server.run()...")
+    
+    try:
+        server_instance.run()
+    except KeyboardInterrupt:
+        print("\nKeyboard interrupt received, shutting down...")
+        server_instance.stop()
+    except Exception as e:
+        print(f"Error during execution: {e}")
+        server_instance.stop()
+        raise
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except Exception as e:
+        import traceback
+        print(f"FATAL ERROR in main(): {e}")
+        print("Full traceback:")
+        traceback.print_exc()
+        sys.exit(1)

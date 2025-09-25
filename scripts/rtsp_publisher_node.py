@@ -58,16 +58,32 @@ class SharedMemoryReader:
             self.mmap.seek(0)
             header_data = self.mmap.read(self.header_size)
             if len(header_data) != self.header_size:
+                rospy.logwarn_throttle(5, f"[{self.name}] Header read failed: got {len(header_data)}, expected {self.header_size}")
                 return None
             
             width, height, timestamp_us, frame_size = self._header_struct.unpack(header_data)
             
+            # Enhanced debug logging (throttled to avoid spam)
+            file_size = os.path.getsize(self.shm_path) if os.path.exists(self.shm_path) else 0
+            rospy.loginfo_throttle(10, f"[{self.name}] File size: {file_size} bytes, mmap size: {len(self.mmap)} bytes")
+            rospy.loginfo_throttle(10, f"[{self.name}] Header: {width}x{height}, frame_size={frame_size}, timestamp={timestamp_us}")
+            rospy.loginfo_throttle(10, f"[{self.name}] Raw header bytes: {header_data.hex()}")
+            
             if width == 0 or height == 0 or frame_size == 0:
+                rospy.logwarn_throttle(5, f"[{self.name}] Invalid header: width={width}, height={height}, frame_size={frame_size}")
+                rospy.logwarn_throttle(5, f"[{self.name}] All header data is zeros - stream server not writing data!")
+                return None
+            
+            # Validate frame size makes sense
+            expected_size = width * height * 3
+            if frame_size != expected_size:
+                rospy.logwarn_throttle(5, f"[{self.name}] Frame size mismatch: got {frame_size}, expected {expected_size} ({width}x{height}x3)")
                 return None
             
             # Read frame data
             frame_data = self.mmap.read(frame_size)
             if len(frame_data) != frame_size:
+                rospy.logwarn_throttle(5, f"[{self.name}] Frame data read failed: got {len(frame_data)}, expected {frame_size}")
                 return None
             
             # Convert to numpy array (zero-copy from memoryview)
@@ -76,10 +92,13 @@ class SharedMemoryReader:
             
             timestamp = timestamp_us / 1000000.0  # Convert back to seconds
             
+            # Success logging (throttled)
+            rospy.loginfo_throttle(30, f"[{self.name}] Successfully read frame: {width}x{height}, timestamp={timestamp}")
+            
             return frame, timestamp
             
         except Exception as e:
-            rospy.logwarn(f"Error reading frame from {self.name}: {e}")
+            rospy.logwarn_throttle(5, f"[{self.name}] Error reading frame: {e}")
             return None
     
     def close(self):
@@ -205,15 +224,21 @@ class EnhancedROSCameraPublisher:
         # JPEG compression parameters for cv2
         jpeg_params = [cv2.IMWRITE_JPEG_QUALITY, self.jpeg_quality]
         
+        frame_count = 0
         while self.running and not rospy.is_shutdown():
             try:
                 # Read frame from shared memory
                 result = self.shm_reader.read_frame()
                 if result is None:
+                    rospy.logwarn_throttle(10, f"[{self.stream_name}] No frame data available from shared memory")
                     rate.sleep()
                     continue
                 
                 frame, timestamp = result
+                frame_count += 1
+                
+                # Log publishing activity
+                rospy.loginfo_throttle(30, f"[{self.stream_name}] Publishing frame #{frame_count}, shape: {frame.shape}")
                 
                 # Create ROS timestamp
                 ros_time = rospy.Time.now()

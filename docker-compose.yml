@@ -15,6 +15,7 @@ services:
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=all
       - CONFIG_FILE=/app/config/cameras.json
+      - PYTHONUNBUFFERED=1
     volumes:
       - ./config/cameras.json:/app/config/cameras.json:ro
       - /dev/shm:/dev/shm:rw  # Shared memory with read-write
@@ -45,6 +46,7 @@ services:
     restart: unless-stopped
     depends_on:
       - stream-server
+      - roscore
     ipc: host  # Share IPC namespace with host
     shm_size: '2g'  # Allocate shared memory for ROS
     environment:
@@ -57,7 +59,7 @@ services:
       - /tmp:/tmp:rw  # Additional shared space
     network_mode: host
 
-  # ROS Master (optional - only if you don't have external ROS master)
+  # ROS Master (roscore)
   roscore:
     image: ros:noetic-ros-core
     container_name: rtsp_roscore
@@ -65,5 +67,3 @@ services:
     network_mode: host
     environment:
       - ROS_HOSTNAME=localhost
-    profiles:
-      - standalone  # Only run with --profile standalone
