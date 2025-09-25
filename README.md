@@ -38,16 +38,25 @@ roslaunch rtsp_camera_streamer rtsp_camera.launch streamer_only:=true
 ## Available Topics
 
 ### Image Streams
-- `/camera/camera1_main/image_raw` - Raw 2560x1440 @ 4fps
+**Camera 1 (192.168.51.106):**
+- `/camera/camera1_main/image_raw` - Raw 2688x1520 @ 5fps
 - `/camera/camera1_main/image_raw/compressed` - JPEG compressed
 - `/camera/camera1_main/image_raw/theora` - Theora video (default enabled)
 - `/camera/camera1_sub/image_raw` - Raw 640x480 @ 30fps
 - `/camera/camera1_sub/image_raw/compressed` - JPEG compressed
 - `/camera/camera1_sub/image_raw/theora` - Theora video
 
+**Camera 2 (192.168.51.105):**
+- `/camera/camera2_main/image_raw` - Raw 2688x1520 @ 5fps
+- `/camera/camera2_main/image_raw/compressed` - JPEG compressed
+- `/camera/camera2_main/image_raw/theora` - Theora video (default enabled)
+- `/camera/camera2_sub/image_raw` - Raw 640x480 @ 30fps
+- `/camera/camera2_sub/image_raw/compressed` - JPEG compressed
+- `/camera/camera2_sub/image_raw/theora` - Theora video
+
 ### Camera Info
-- `/camera/camera1_main/camera_info`
-- `/camera/camera1_sub/camera_info`
+- `/camera/camera1_main/camera_info` & `/camera/camera1_sub/camera_info`
+- `/camera/camera2_main/camera_info` & `/camera/camera2_sub/camera_info`
 
 ## Viewing Options
 
@@ -60,14 +69,17 @@ rosrun rviz rviz -d $(rospack find rtsp_camera_streamer)/config/camera_display.r
 
 ### image_view
 ```bash
-# Raw stream
+# View Camera 1 main stream
 rosrun image_view image_view image:=/camera/camera1_main/image_raw
+
+# View Camera 2 main stream  
+rosrun image_view image_view image:=/camera/camera2_main/image_raw
 
 # Compressed stream (lower bandwidth)
 rosrun image_view image_view image:=/camera/camera1_main/image_raw _image_transport:=compressed
 
 # Theora stream (lowest bandwidth)
-rosrun image_view image_view image:=/camera/camera1_main/image_raw _image_transport:=theora
+rosrun image_view image_view image:=/camera/camera2_main/image_raw _image_transport:=theora
 ```
 
 ### rqt

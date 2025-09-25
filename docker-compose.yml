@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Stream Server - Hardware accelerated decoding with L4T 36+
   stream-server:
