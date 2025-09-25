@@ -18,7 +18,7 @@ services:
       - ROS_HOSTNAME=localhost
       - DECODER_TYPE=jetson
       - CUDA_VISIBLE_DEVICES=0
-      - GST_PLUGIN_PATH=/usr/lib/aarch64-linux-gnu/gstreamer-1.0:/usr/lib/aarch64-linux-gnu/tegra-mmapi
+      - GST_PLUGIN_PATH=/host/gstreamer-1.0:/usr/lib/aarch64-linux-gnu/gstreamer-1.0:/usr/lib/aarch64-linux-gnu/tegra-mmapi
       - LD_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu/tegra:/usr/lib/aarch64-linux-gnu/tegra-mmapi:/opt/nvidia/vpi2/lib64:/usr/lib/aarch64-linux-gnu:/usr/local/lib
       - NVMEDIA_ENABLE_TRACKING=1
       - NVMEDIA_ENABLE_PROFILING=0
@@ -27,6 +27,9 @@ services:
     volumes:
       - ../config/rtsp_cam_config.yaml:/catkin_ws/src/rtsp_cam/config/rtsp_cam_config.yaml:ro
       - ${PHOTO_DIR:-/tmp/rtsp_cam_photos}:/tmp/rtsp_cam_photos
+      # Mount host Jetson plugins to avoid GLIBC conflicts
+      - /usr/lib/aarch64-linux-gnu/gstreamer-1.0:/host/gstreamer-1.0:ro
+      - /usr/lib/aarch64-linux-gnu/tegra:/usr/lib/aarch64-linux-gnu/tegra:ro
     devices:
       - /dev/nvhost-ctrl
       - /dev/nvhost-ctrl-gpu
