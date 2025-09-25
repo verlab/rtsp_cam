@@ -31,10 +31,6 @@ else
     echo "✗ nvvidconv not found"
 fi
 
-# Check for hardware acceleration devices
-echo "Checking hardware devices:"
-ls -la /dev/nv* 2>/dev/null || echo "No NVIDIA devices found"
-
 # Check shared memory directory
 mkdir -p /dev/shm
 echo "Shared memory directory: /dev/shm"
