@@ -1,37 +1,29 @@
 <?xml version="1.0"?>
-<package>
-  <name>rtsp_cam</name>
+<package format="2">
+  <name>rtsp_camera_streamer</name>
   <version>1.0.0</version>
-  <description>Generic ROS 1 Noetic package for RTSP cameras with streaming, PTZ control, and photo capture capabilities on Jetson Orin NX</description>
-  
-  <maintainer email="rezeck@ufmg.br">rezeck</maintainer>
-  <license>MIT</license>
+  <description>High-performance RTSP camera streamer with hardware acceleration for Jetson platforms</description>
 
-  <author email="rezeck@ufmg.br">rezeck</author>
+  <maintainer email="your-email@example.com">Your Name</maintainer>
+  <license>MIT</license>
 
   <buildtool_depend>catkin</buildtool_depend>
 
-  <build_depend>rospy</build_depend>
-  <build_depend>sensor_msgs</build_depend>
-  <build_depend>std_msgs</build_depend>
-  <build_depend>std_srvs</build_depend>
-  <build_depend>geometry_msgs</build_depend>
-  <build_depend>image_transport</build_depend>
-  <build_depend>camera_info_manager</build_depend>
-  <build_depend>message_generation</build_depend>
+  <!-- ROS dependencies -->
+  <depend>rospy</depend>
+  <depend>std_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>image_transport</depend>
+  <depend>cv_bridge</depend>
+  <depend>compressed_image_transport</depend>
+  <depend>theora_image_transport</depend>
 
-  <run_depend>rospy</run_depend>
-  <run_depend>sensor_msgs</run_depend>
-  <run_depend>std_msgs</run_depend>
-  <run_depend>std_srvs</run_depend>
-  <run_depend>geometry_msgs</run_depend>
-  <run_depend>image_transport</run_depend>
-  <run_depend>camera_info_manager</run_depend>
-  <run_depend>message_runtime</run_depend>
-
-  <test_depend>rostest</test_depend>
+  <!-- Python dependencies -->
+  <exec_depend>python3-numpy</exec_depend>
+  <exec_depend>python3-opencv</exec_depend>
 
   <export>
-    <rosdoc config="$(find rtsp_cam)/rosdoc.yaml"/>
+    <!-- ROS package -->
   </export>
-</package> 
+</package>

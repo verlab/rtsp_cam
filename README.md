@@ -1,331 +1,164 @@
-# RTSP Camera ROS 1 Noetic Package
+# RTSP Camera Streamer - ROS 1 Noetic Package
 
-A comprehensive ROS 1 Noetic package for generic RTSP cameras with streaming, PTZ control, and photo capture capabilities. Optimized for Jetson Orin NX with hardware acceleration support.
+High-performance RTSP camera streaming system with hardware acceleration for Jetson platforms.
 
 ## Features
 
-- **Universal RTSP Support**: Works with any RTSP-compatible camera
-- **Jetson Orin NX Optimized**: Hardware acceleration using nvv4l2decoder
-- **Multiple Decoder Options**: Software, NVIDIA GPU, Jetson hardware acceleration
-- **Dual Stream Support**: Main and secondary RTSP streams with H.264/H.265 encoding
-- **High Performance**: Uses GStreamer for efficient video processing
-- **PTZ Control**: Pan, Tilt, Zoom control via HTTP interfaces (when supported)
-- **Photo Capture**: Service-based photo capture with multiple methods
-- **Configurable**: Easy configuration through YAML files
-- **ROS 1 Noetic Native**: Built for ROS 1 Noetic with catkin build system
+🚀 **Hardware Accelerated**: Uses Jetson nvv4l2decoder + nvvidconv  
+📺 **Multiple Formats**: Raw, JPEG compressed, and Theora video streaming  
+🔧 **ROS Integration**: Full ROS 1 Noetic package with image_transport  
+🎯 **Low Latency**: Direct shared memory between streamer and publisher  
+📱 **Visualization**: Built-in RViz configuration for immediate viewing  
 
-## Hardware Decoder Support
+## Quick Start
 
-| Decoder Type | GStreamer Elements | Use Case |
-|--------------|-------------------|----------|
-| `software` | `avdec_h264`, `avdec_h265` | CPU-only systems, development |
-| `nvidia` | `nvh264dec`, `nvh265dec` | NVIDIA GPU systems (RTX, GTX, etc.) |
-| `jetson` | `nvv4l2decoder` | NVIDIA Jetson platforms (Nano, Xavier, Orin NX) |
-| `vaapi` | `vaapih264dec`, `vaapih265dec` | Intel/AMD GPU systems |
-
-**Recommended for Jetson Orin NX**: Use `jetson` decoder type for optimal performance.
-
-## Quick Start for Jetson Orin NX
-
-### Docker-based Installation (Recommended)
-
-The easiest way to run this package on Jetson Orin NX is using Docker with the L4T base image:
-
+### 1. Launch Everything (Docker)
 ```bash
-# Clone the repository
-git clone <repository-url> rtsp_cam
-cd rtsp_cam
+# Start complete system with RViz
+docker-compose up
 
-# Build and run with Docker
-cd docker
-./build_jetson.sh
-docker-compose -f docker-compose.jetson.yml up -d
+# View streams in RViz - automatically opens with camera feeds
 ```
 
-### Manual Installation (Alternative)
-
-If you prefer to install directly on the Jetson:
-
-#### Prerequisites
-
+### 2. Native ROS Launch
 ```bash
-# Install ROS 1 Noetic (Ubuntu 20.04)
-sudo sh -c 'echo "deb http://packages.ros.org/ros/ubuntu $(lsb_release -sc) main" > /etc/apt/sources.list.d/ros-latest.list'
-sudo apt-key adv --keyserver 'hkp://keyserver.ubuntu.com:80' --recv-key C1CF6E31E6BADE8868B172B4F42ED6FBAB17C654
-sudo apt update
-sudo apt install -y ros-noetic-desktop-full
+# Complete system with RViz (default)
+roslaunch rtsp_camera_streamer rtsp_camera.launch
 
-# Install GStreamer and dependencies
-sudo apt install -y \
-    python3-pip python3-opencv \
-    libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
-    gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
-    gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly \
-    gstreamer1.0-libav gstreamer1.0-tools \
-    libgirepository1.0-dev python3-gi python3-requests
+# Without RViz
+roslaunch rtsp_camera_streamer rtsp_camera.launch launch_rviz:=false
 
-# Install ROS 1 packages
-sudo apt install -y \
-    ros-noetic-cv-bridge ros-noetic-image-transport \
-    ros-noetic-camera-info-manager ros-noetic-sensor-msgs \
-    ros-noetic-geometry-msgs ros-noetic-std-srvs
+# Only publisher (if streamer runs in Docker)
+roslaunch rtsp_camera_streamer rtsp_camera.launch publisher_only:=true
 
-# For Jetson Orin NX support
-sudo apt install -y \
-    nvidia-l4t-gstreamer \
-    gstreamer1.0-nvv4l2 \
-    gstreamer1.0-plugins-nvcodec
+# Only streamer
+roslaunch rtsp_camera_streamer rtsp_camera.launch streamer_only:=true
 ```
 
-#### Build Package
+## Available Topics
 
+### Image Streams
+- `/camera/camera1_main/image_raw` - Raw 2560x1440 @ 4fps
+- `/camera/camera1_main/image_raw/compressed` - JPEG compressed
+- `/camera/camera1_main/image_raw/theora` - Theora video (default enabled)
+- `/camera/camera1_sub/image_raw` - Raw 640x480 @ 30fps
+- `/camera/camera1_sub/image_raw/compressed` - JPEG compressed
+- `/camera/camera1_sub/image_raw/theora` - Theora video
+
+### Camera Info
+- `/camera/camera1_main/camera_info`
+- `/camera/camera1_sub/camera_info`
+
+## Viewing Options
+
+### RViz (Recommended)
 ```bash
-# Create catkin workspace
-mkdir -p ~/catkin_ws/src
-cd ~/catkin_ws/src
+# Launches automatically with rtsp_camera.launch
+# Or manually:
+rosrun rviz rviz -d $(rospack find rtsp_camera_streamer)/config/camera_display.rviz
+```
 
-# Clone package
-git clone <repository-url> rtsp_cam
+### image_view
+```bash
+# Raw stream
+rosrun image_view image_view image:=/camera/camera1_main/image_raw
 
-# Build
-cd ~/catkin_ws
-source /opt/ros/noetic/setup.bash
-catkin_make
-source devel/setup.bash
+# Compressed stream (lower bandwidth)
+rosrun image_view image_view image:=/camera/camera1_main/image_raw _image_transport:=compressed
+
+# Theora stream (lowest bandwidth)
+rosrun image_view image_view image:=/camera/camera1_main/image_raw _image_transport:=theora
+```
+
+### rqt
+```bash
+# GUI for multiple camera views
+rosrun rqt_image_view rqt_image_view
 ```
 
 ## Configuration
 
-Edit `config/rtsp_cam_config.yaml`:
-
-```yaml
-# Camera connection
-camera_ip: "192.168.1.100"
-username: "admin" 
-password: "password"
-
-# RTSP URLs (customize for your camera)
-main_stream_url: "rtsp://admin:password@192.168.1.100:554/stream1"
-sub_stream_url: "rtsp://admin:password@192.168.1.100:554/stream2"
-
-# Hardware decoding: "software", "nvidia", "jetson", "vaapi"
-decoder_type: "jetson"  # Optimized for Jetson Orin NX
-
-# Stream settings
-main_stream_enabled: true
-sub_stream_enabled: false
-frame_rate: 30
-
-# PTZ control (optional, for PTZ cameras)
-ptz_enabled: true
-http_port: 80
-
-# Photo capture
-photo_save_path: "/tmp/rtsp_cam_photos"
+Edit `config/cameras.json`:
+```json
+{
+  "cameras": [
+    {
+      "name": "camera1",
+      "host": "192.168.51.106",
+      "port": 554,
+      "username": "admin",
+      "password": "verlab10",
+      "channels": [
+        {
+          "name": "main",
+          "stream_path": "/cam/realmonitor?channel=1&subtype=0",
+          "width": 2560,
+          "height": 1440,
+          "fps": 4
+        }
+      ]
+    }
+  ]
+}
 ```
 
-## Usage
+## Launch Options
 
-### Docker (Recommended for Jetson)
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `launch_rviz` | `true` | Launch RViz with camera display |
+| `publish_theora` | `true` | Enable Theora video compression |
+| `jpeg_quality` | `80` | JPEG compression quality (1-100) |
+| `publish_raw` | `true` | Publish raw image topics |
+| `publish_compressed` | `true` | Publish JPEG compressed topics |
+| `streamer_only` | `false` | Only run hardware streamer |
+| `publisher_only` | `false` | Only run ROS publisher |
 
-```bash
-# Start the complete system
-docker-compose -f docker/docker-compose.jetson.yml up -d
+## Architecture
 
-# View logs
-docker-compose -f docker/docker-compose.jetson.yml logs -f
-
-# Stop the system
-docker-compose -f docker/docker-compose.jetson.yml down
-
-# Development mode
-docker-compose -f docker/docker-compose.jetson.yml run rtsp-cam-dev
+```
+┌─────────────────┐    ┌──────────────┐    ┌─────────────┐
+│ RTSP Camera     │────│ Jetson       │────│ ROS Topics  │
+│ H.264 Stream    │    │ HW Decoder   │    │ Multi-format│
+└─────────────────┘    └──────────────┘    └─────────────┘
+                              │
+                       ┌──────────────┐
+                       │ Shared Memory│
+                       │ (Zero-copy)  │
+                       └──────────────┘
 ```
 
-### Manual Installation
+## Performance
 
-```bash
-# Source the workspace
-source ~/catkin_ws/devel/setup.bash
+- **Hardware Decoding**: ~5ms latency on Jetson Orin
+- **Shared Memory**: Zero-copy between processes  
+- **Bandwidth**: Raw: ~11MB/frame, JPEG: ~500KB/frame, Theora: ~100KB/frame
 
-# Launch all nodes
-roslaunch rtsp_cam rtsp_cam.launch
+## Repository Structure
 
-# Individual nodes
-rosrun rtsp_cam rtsp_cam_node.py
-rosrun rtsp_cam rtsp_ptz_controller.py
-rosrun rtsp_cam rtsp_photo_service.py
+```
+rtsp_camera_streamer/
+├── package.xml              # ROS package definition
+├── CMakeLists.txt           # Build configuration  
+├── scripts/                 # Executable nodes
+│   ├── rtsp_streamer_node.py    # Hardware streamer
+│   └── rtsp_publisher_node.py   # ROS publisher
+├── launch/
+│   └── rtsp_camera.launch   # Single launch file
+├── config/
+│   ├── cameras.json         # Camera configuration
+│   └── camera_display.rviz  # RViz configuration
+├── docker-compose.yml       # Docker deployment
+├── stream_server/           # Docker files for streamer
+└── ros_publisher/           # Docker files for publisher
 ```
 
-### ROS 1 Interface
+## Requirements
 
-#### Published Topics
-- `/camera/main/image_raw` (sensor_msgs/Image) - Main stream
-- `/camera/sub/image_raw` (sensor_msgs/Image) - Secondary stream  
-- `/camera/main/camera_info` (sensor_msgs/CameraInfo) - Main stream camera info
-- `/camera/sub/camera_info` (sensor_msgs/CameraInfo) - Sub stream camera info
-- `/camera/ptz_status` (std_msgs/String) - PTZ status (if available)
-- `/camera/joint_states` (sensor_msgs/JointState) - PTZ joint states (if available)
+- **Hardware**: NVIDIA Jetson (Orin, Xavier, Nano)
+- **Software**: ROS 1 Noetic, Docker (optional)
+- **Network**: RTSP camera access
 
-#### Subscribed Topics
-- `/camera/ptz_cmd` (geometry_msgs/Twist) - PTZ commands (if available)
+---
 
-#### Services
-- `/camera/take_photo` (std_srvs/Trigger) - Capture photo
-
-### Examples
-
-#### View Camera Stream
-```bash
-ros2 run rqt_image_view rqt_image_view /camera/main/image_raw
-```
-
-#### Control PTZ (if available)
-```bash
-# Pan right
-ros2 topic pub /camera/ptz_cmd geometry_msgs/msg/Twist "{linear: {y: 0.5}}"
-
-# Tilt up  
-ros2 topic pub /camera/ptz_cmd geometry_msgs/msg/Twist "{linear: {x: 0.5}}"
-
-# Zoom in
-ros2 topic pub /camera/ptz_cmd geometry_msgs/msg/Twist "{linear: {z: 0.5}}"
-
-# Stop
-ros2 topic pub /camera/ptz_cmd geometry_msgs/msg/Twist "{}"
-```
-
-#### Capture Photo
-```bash
-ros2 service call /camera/take_photo std_srvs/srv/Trigger
-```
-
-## Performance Optimization
-
-### Hardware Acceleration
-
-Configure the appropriate decoder in your config:
-
-```yaml
-# For NVIDIA GPUs
-decoder_type: "nvidia"
-
-# For Jetson devices  
-decoder_type: "jetson"
-
-# For Intel/AMD GPUs
-decoder_type: "vaapi"
-
-# For CPU-only (fallback)
-decoder_type: "software"
-```
-
-### Custom GStreamer Pipelines
-
-For advanced users, you can specify custom pipelines:
-
-```yaml
-gst_pipeline_main: "rtspsrc location=rtsp://... ! rtph264depay ! nvh264dec ! videoconvert ! appsink"
-```
-
-## Docker Deployment
-
-See [docker/README.md](docker/README.md) for detailed Docker deployment instructions.
-
-### Quick Docker Commands
-
-```bash
-# CPU version
-docker-compose --profile cpu up -d
-
-# NVIDIA GPU version (requires nvidia-docker2)
-docker-compose --profile nvidia up -d
-
-# Jetson version
-docker-compose --profile jetson up -d
-
-# Development mode
-docker-compose --profile dev up -d
-docker exec -it rtsp_cam_dev bash
-```
-
-## Camera Compatibility
-
-This package works with any RTSP-compatible camera including:
-
-- IP cameras (Hikvision, Dahua, Axis, etc.)
-- USB cameras with RTSP servers
-- Network cameras with ONVIF support
-- Security camera systems
-- Web cameras with RTSP capability
-
-### Common RTSP URL Formats
-
-```bash
-# Generic format
-rtsp://username:password@ip:port/path
-
-# Hikvision
-rtsp://admin:password@192.168.1.100:554/Streaming/Channels/101
-
-# Dahua
-rtsp://admin:password@192.168.1.100:554/cam/realmonitor?channel=1&subtype=0
-
-# Axis
-rtsp://root:password@192.168.1.100:554/axis-media/media.amp
-```
-
-## Troubleshooting
-
-### Common Issues
-
-1. **No video stream**: Check RTSP URL, credentials, and network connectivity
-2. **Poor performance**: Try hardware decoder or reduce resolution
-3. **Build errors**: Ensure all dependencies are installed
-4. **PTZ not working**: PTZ requires camera-specific HTTP commands
-
-### Debug Commands
-
-```bash
-# Test RTSP stream
-ffplay rtsp://username:password@camera_ip:554/stream_path
-
-# Check GStreamer capabilities  
-gst-inspect-1.0 | grep h264
-
-# View ROS 2 topics
-ros2 topic list
-ros2 topic echo /camera/main/image_raw
-```
-
-### Performance Tuning
-
-```yaml
-# Reduce latency
-buffer_size: 1
-frame_rate: 15
-
-# Custom pipeline for low latency
-gst_pipeline_main: "rtspsrc location=... latency=0 ! rtph264depay ! h264parse ! nvh264dec ! videoconvert ! appsink max-buffers=1 drop=true"
-```
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable  
-5. Submit a pull request
-
-## License
-
-This project is licensed under the MIT License.
-
-## Author
-
-- **Name**: rezeck
-- **Email**: rezeck@ufmg.br
-
-## Acknowledgments
-
-Based on the original Jidetech camera driver, generalized for universal RTSP camera support.
+**Ready to stream!** 🎥

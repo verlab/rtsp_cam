@@ -1,32 +1,34 @@
 cmake_minimum_required(VERSION 3.0.2)
-project(rtsp_cam)
-
-## Compile as C++11, supported in ROS Kinetic and newer
-add_compile_options(-std=c++11)
+project(rtsp_camera_streamer)
 
 ## Find catkin macros and libraries
 find_package(catkin REQUIRED COMPONENTS
   rospy
-  sensor_msgs
   std_msgs
-  std_srvs
+  sensor_msgs
   geometry_msgs
   image_transport
-  camera_info_manager
-  message_generation
+  cv_bridge
+  compressed_image_transport
+  theora_image_transport
 )
 
 ## System dependencies are found with CMake's conventions
-# OpenCV not needed for pure GStreamer streaming
+find_package(PkgConfig REQUIRED)
 
 ###################################
 ## catkin specific configuration ##
 ###################################
 catkin_package(
-  INCLUDE_DIRS
-  LIBRARIES
-  CATKIN_DEPENDS rospy sensor_msgs std_msgs std_srvs geometry_msgs image_transport camera_info_manager message_runtime
-  DEPENDS
+  CATKIN_DEPENDS 
+    rospy 
+    std_msgs 
+    sensor_msgs 
+    geometry_msgs
+    image_transport
+    cv_bridge
+    compressed_image_transport
+    theora_image_transport
 )
 
 ###########
@@ -42,24 +44,29 @@ include_directories(
 ## Install ##
 #############
 
-# Install Python modules
+# Install Python executables
 catkin_install_python(PROGRAMS
-  scripts/rtsp_cam_node.py
-  scripts/rtsp_ptz_controller.py
-  scripts/rtsp_photo_service.py
+  scripts/rtsp_streamer_node.py
+  scripts/rtsp_publisher_node.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
 # Install launch files
-install(DIRECTORY
-  launch/
-  config/
-  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+install(DIRECTORY launch/
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/launch
+  FILES_MATCHING PATTERN "*.launch"
 )
 
-# Install Python package
-install(DIRECTORY
-  rtsp_cam/
-  DESTINATION ${CATKIN_PACKAGE_PYTHON_DESTINATION}
-  FILES_MATCHING PATTERN "*.py"
-) 
+# Install config files
+install(DIRECTORY config/
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/config
+  FILES_MATCHING PATTERN "*.json" PATTERN "*.yaml"
+)
+
+#############
+## Testing ##
+#############
+if(CATKIN_ENABLE_TESTING)
+  find_package(rostest REQUIRED)
+  # Add tests here if needed
+endif()

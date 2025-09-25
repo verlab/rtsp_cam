@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  # Stream Server - Hardware accelerated decoding with L4T 36+
+  stream-server:
+    build:
+      context: .
+      dockerfile: stream_server/Dockerfile
+    image: rtsp_stream_server:jetson
+    container_name: rtsp_stream_server
+    restart: unless-stopped
+    network_mode: host
+    runtime: nvidia
+    shm_size: '4g' # Allocate 4 GB of shared memory
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+      - CONFIG_FILE=/app/config/cameras.json
+    volumes:
+      - ./config/cameras.json:/app/config/cameras.json:ro
+      - /dev/shm:/dev/shm  # Shared memory
+    devices:
+      - /dev/nvhost-ctrl
+      - /dev/nvhost-ctrl-gpu
+      - /dev/nvhost-prof-gpu
+      - /dev/nvmap
+      - /dev/nvhost-gpu
+      - /dev/nvhost-as-gpu
+      - /dev/nvhost-sched-gpu
+      - /dev/nvhost-tsg-gpu
+      - /dev/v4l2-nvdec
+      - /dev/nvhost-ctrl-vi0
+      - /dev/nvhost-ctrl-vi1
+      - /dev/nvhost-ctrl-isp
+      - /dev/nvhost-ctrl-nvcsi
+    privileged: true
+
+  # ROS Publisher - ROS 1 Noetic
+  ros-publisher:
+    build:
+      context: .
+      dockerfile: ros_publisher/Dockerfile
+    image: rtsp_ros_publisher:noetic
+    container_name: rtsp_ros_publisher
+    restart: unless-stopped
+    depends_on:
+      - stream-server
+    environment:
+      - ROS_MASTER_URI=${ROS_MASTER_URI:-http://localhost:11311}
+      - ROS_HOSTNAME=${ROS_HOSTNAME:-localhost}
+      - CONFIG_FILE=/app/config/cameras.json
+    volumes:
+      - ./config/cameras.json:/app/config/cameras.json:ro
+      - /dev/shm:/dev/shm  # Shared memory
+    network_mode: host
+
+  # ROS Master (optional - only if you don't have external ROS master)
+  roscore:
+    image: ros:noetic-ros-core
+    container_name: rtsp_roscore
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      - ROS_HOSTNAME=localhost
+    profiles:
+      - standalone  # Only run with --profile standalone
