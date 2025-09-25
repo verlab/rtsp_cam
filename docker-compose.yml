@@ -8,15 +8,17 @@ services:
     container_name: rtsp_stream_server
     restart: unless-stopped
     network_mode: host
+    ipc: host  # Share IPC namespace with host
     runtime: nvidia
-    shm_size: '4g' # Allocate 4 GB of shared memory
+    shm_size: '2g' # Allocate 4 GB of shared memory
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=all
       - CONFIG_FILE=/app/config/cameras.json
     volumes:
       - ./config/cameras.json:/app/config/cameras.json:ro
-      - /dev/shm:/dev/shm  # Shared memory
+      - /dev/shm:/dev/shm:rw  # Shared memory with read-write
+      - /tmp:/tmp:rw  # Additional shared space
     devices:
       - /dev/nvhost-ctrl
       - /dev/nvhost-ctrl-gpu
@@ -43,13 +45,16 @@ services:
     restart: unless-stopped
     depends_on:
       - stream-server
+    ipc: host  # Share IPC namespace with host
+    shm_size: '2g'  # Allocate shared memory for ROS
     environment:
       - ROS_MASTER_URI=${ROS_MASTER_URI:-http://localhost:11311}
       - ROS_HOSTNAME=${ROS_HOSTNAME:-localhost}
       - CONFIG_FILE=/app/config/cameras.json
     volumes:
       - ./config/cameras.json:/app/config/cameras.json:ro
-      - /dev/shm:/dev/shm  # Shared memory
+      - /dev/shm:/dev/shm:rw  # Shared memory with read-write
+      - /tmp:/tmp:rw  # Additional shared space
     network_mode: host
 
   # ROS Master (optional - only if you don't have external ROS master)
