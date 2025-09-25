@@ -14,7 +14,33 @@
           "width": 2688,
           "height": 1520,
           "encoding": "h264",
-          "fps": 4
+          "fps": 5
+        },
+        {
+          "name": "sub",
+          "stream_path": "/cam/realmonitor?channel=1&subtype=1",
+          "width": 640,
+          "height": 480,
+          "encoding": "h264",
+          "fps": 30
+        }
+      ]
+    },
+    {
+      "name": "camera2",
+      "description": "Second RTSP camera",
+      "host": "192.168.51.105",
+      "port": 554,
+      "username": "admin",
+      "password": "verlab10",
+      "channels": [
+        {
+          "name": "main",
+          "stream_path": "/cam/realmonitor?channel=1&subtype=0",
+          "width": 2688,
+          "height": 1520,
+          "encoding": "h264",
+          "fps": 5
         },
         {
           "name": "sub",

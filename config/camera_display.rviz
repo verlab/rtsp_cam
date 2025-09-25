@@ -59,7 +59,7 @@ Visualization Manager:
       Max Value: 1
       Median window: 5
       Min Value: 0
-      Name: "Camera 1 Main (2560x1440)"
+      Name: "Camera 1 Main (2688x1520)"
       Normalize Range: true
       Queue Size: 2
       Transport Hint: compressed
@@ -72,6 +72,30 @@ Visualization Manager:
       Median window: 5
       Min Value: 0
       Name: "Camera 1 Sub (640x480)"
+      Normalize Range: true
+      Queue Size: 2
+      Transport Hint: compressed
+      Unreliable: false
+      Value: true
+    - Class: rviz/Image
+      Enabled: true
+      Image Topic: /camera/camera2_main/image_raw
+      Max Value: 1
+      Median window: 5
+      Min Value: 0
+      Name: "Camera 2 Main (2688x1520)"
+      Normalize Range: true
+      Queue Size: 2
+      Transport Hint: compressed
+      Unreliable: false
+      Value: true
+    - Class: rviz/Image
+      Enabled: true
+      Image Topic: /camera/camera2_sub/image_raw
+      Max Value: 1
+      Median window: 5
+      Min Value: 0
+      Name: "Camera 2 Sub (640x480)"
       Normalize Range: true
       Queue Size: 2
       Transport Hint: compressed
