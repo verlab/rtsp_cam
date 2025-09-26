@@ -11,8 +11,8 @@
         {
           "name": "main",
           "stream_path": "/cam/realmonitor?channel=1&subtype=0",
-          "width": 2688,
-          "height": 1520,
+          "width": 1920,
+          "height": 1080,
           "encoding": "h264",
           "fps": 5
         },
@@ -22,7 +22,7 @@
           "width": 640,
           "height": 480,
           "encoding": "h264",
-          "fps": 30
+          "fps": 25
         }
       ]
     },
@@ -37,8 +37,8 @@
         {
           "name": "main",
           "stream_path": "/cam/realmonitor?channel=1&subtype=0",
-          "width": 2688,
-          "height": 1520,
+          "width": 1920,
+          "height": 1080,
           "encoding": "h264",
           "fps": 5
         },
@@ -48,7 +48,7 @@
           "width": 640,
           "height": 480,
           "encoding": "h264",
-          "fps": 30
+          "fps": 25
         }
       ]
     }
