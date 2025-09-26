@@ -1,27 +1,20 @@
 <?xml version="1.0"?>
 <launch>
-  <!-- RTSP Camera System - Complete Solution -->
+  <!-- RTSP Camera System - Complete Solution with roscore -->
   
   <!-- Launch Arguments -->
-  <arg name="config_file" default="$(find rtsp_camera_streamer)/config/cameras.json" />
+  <arg name="config_file" default="/app/config/cameras.json" />
   <arg name="jpeg_quality" default="80" />
   <arg name="publish_raw" default="true" />
   <arg name="publish_compressed" default="true" />
-  <arg name="publish_theora" default="true" />
-  <arg name="launch_rviz" default="true" />
+  <arg name="publish_theora" default="false" />
+  <arg name="launch_rviz" default="false" />
   <arg name="streamer_only" default="false" />
-  <arg name="publisher_only" default="false" />
+  <arg name="publisher_only" default="true" />
   
-  <!-- Stream Server Node (Hardware Accelerated) - Skip if publisher_only -->
-  <group unless="$(arg publisher_only)">
-    <node name="rtsp_streamer" pkg="rtsp_camera_streamer" type="rtsp_streamer_node.py" output="screen">
-      <param name="config_file" value="$(arg config_file)" />
-    </node>
-  </group>
-  
-  <!-- Enhanced ROS Publisher Node - Skip if streamer_only -->
+  <!-- Enhanced ROS Publisher Node - Only publisher in this container -->
   <group unless="$(arg streamer_only)">
-    <node name="rtsp_publisher" pkg="rtsp_camera_streamer" type="rtsp_publisher_node.py" output="screen">
+    <node name="rtsp_publisher" pkg="rtsp_cam" type="rtsp_publisher_node.py" output="screen">
       <param name="config_file" value="$(arg config_file)" />
       <param name="jpeg_quality" value="$(arg jpeg_quality)" />
       <param name="publish_raw" value="$(arg publish_raw)" />

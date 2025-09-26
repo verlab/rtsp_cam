@@ -19,7 +19,7 @@ RUN apt-get update && apt-get install -y \
 RUN curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key | apt-key add - \
     && echo "deb http://packages.ros.org/ros/ubuntu focal main" > /etc/apt/sources.list.d/ros-latest.list
 
-# Install ROS 1 Noetic with image_transport
+# Install ROS 1 Noetic with image_transport and GUI tools
 RUN apt-get update && apt-get install -y \
     ros-noetic-ros-core \
     ros-noetic-rospy \
@@ -37,6 +37,10 @@ RUN apt-get update && apt-get install -y \
     ros-noetic-rqt-image-view \
     python3-rosdep \
     python3-opencv \
+    x11-apps \
+    mesa-utils \
+    libgl1-mesa-glx \
+    libgl1-mesa-dri \
     && rm -rf /var/lib/apt/lists/*
 
 # Initialize rosdep
@@ -48,14 +52,23 @@ RUN pip3 install numpy
 # Create working directory
 WORKDIR /app
 
-# Copy enhanced ROS publisher code
-COPY scripts/rtsp_publisher_node.py /app/
+# Copy entire ROS package
+COPY scripts/ /app/scripts/
 COPY ros_publisher/entrypoint.sh /app/
 COPY config/ /app/config/
+COPY launch/ /app/launch/
+COPY package.xml /app/
+COPY CMakeLists.txt /app/
 RUN chmod +x /app/entrypoint.sh
+
+# Set up ROS workspace with proper package structure
+RUN mkdir -p /catkin_ws/src/rtsp_cam && \
+    cp -r /app/* /catkin_ws/src/rtsp_cam/ && \
+    cd /catkin_ws && \
+    /bin/bash -c "source /opt/ros/noetic/setup.bash && catkin_make"
 
 # Source ROS environment
 RUN echo "source /opt/ros/noetic/setup.bash" >> ~/.bashrc
 
 ENTRYPOINT ["/app/entrypoint.sh"]
-CMD ["python3", "rtsp_publisher_node.py"]
+CMD ["roslaunch", "rtsp_cam", "rtsp_camera.launch"]

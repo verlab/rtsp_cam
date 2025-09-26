@@ -34,9 +34,10 @@ services:
       - /dev/nvhost-ctrl-vi1
       - /dev/nvhost-ctrl-isp
       - /dev/nvhost-ctrl-nvcsi
+      - /dev/dri:/dev/dri  # GPU access for fallback decoding
     privileged: true
 
-  # ROS Publisher - ROS 1 Noetic
+  # ROS Publisher - ROS 1 Noetic (includes roscore via launch)
   ros-publisher:
     build:
       context: .
@@ -46,24 +47,21 @@ services:
     restart: unless-stopped
     depends_on:
       - stream-server
-      - roscore
     ipc: host  # Share IPC namespace with host
     shm_size: '2g'  # Allocate shared memory for ROS
     environment:
       - ROS_MASTER_URI=${ROS_MASTER_URI:-http://localhost:11311}
       - ROS_HOSTNAME=${ROS_HOSTNAME:-localhost}
       - CONFIG_FILE=/app/config/cameras.json
+      - DISPLAY=${DISPLAY:-:0}  # X11 display for GUI applications
+      - QT_X11_NO_MITSHM=1     # Disable MIT-SHM for QT apps
+      - XAUTHORITY=/tmp/.docker.xauth  # X11 authentication
     volumes:
       - ./config/cameras.json:/app/config/cameras.json:ro
       - /dev/shm:/dev/shm:rw  # Shared memory with read-write
       - /tmp:/tmp:rw  # Additional shared space
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw  # X11 socket
+      - ${XAUTHORITY:-$HOME/.Xauthority}:/tmp/.docker.xauth:rw  # X11 auth
     network_mode: host
-
-  # ROS Master (roscore)
-  roscore:
-    image: ros:noetic-ros-core
-    container_name: rtsp_roscore
-    restart: unless-stopped
-    network_mode: host
-    environment:
-      - ROS_HOSTNAME=localhost
+    devices:
+      - /dev/dri:/dev/dri  # GPU access for hardware acceleration

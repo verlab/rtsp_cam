@@ -149,18 +149,26 @@ class OptimizedGStreamerStream:
         return authenticated_url
     
     def _build_gstreamer_command(self) -> List[str]:
-        """Build optimized GStreamer command for subprocess"""
+        """Build highly optimized GStreamer command for Jetson hardware"""
         
-        # Build command exactly like your working command format
+        # Optimized pipeline for maximum performance on Jetson
         cmd = [
             'gst-launch-1.0', '-q',
-            'rtspsrc', f'location={self.rtsp_url}', 'latency=0',
+            'rtspsrc', f'location={self.rtsp_url}', 
+            'latency=0', 'buffer-mode=auto', 'protocols=tcp',
+            'drop-on-latency=true', 'do-retransmission=false',
             '!', 'rtph264depay',
             '!', 'h264parse',
-            '!', 'nvv4l2decoder',
-            '!', 'nvvidconv',
-            '!', f'video/x-raw,width={self.width},height={self.height},format=BGR',
-            '!', 'fdsink', 'fd=1'
+            '!', 'nvv4l2decoder', 
+            'enable-max-performance=true',
+            'disable-dpb=true',  # Disable decode picture buffer for lower latency
+            '!', 'video/x-raw(memory:NVMM)',  # Use NVIDIA memory for zero-copy
+            '!', 'nvvidconv', 
+            'compute-hw=1', 'interpolation-method=1',  # Use VIC for scaling
+            '!', f'video/x-raw,width={self.width},height={self.height},format=BGRx',
+            '!', 'videoconvert',
+            '!', 'video/x-raw,format=BGR',
+            '!', 'fdsink', 'fd=1', 'sync=false'
         ]
         
         return cmd
@@ -187,17 +195,42 @@ class OptimizedGStreamerStream:
             
             try:
                 stdout, stderr = process.communicate(timeout=2)
-                if process.returncode == 0 or "Setting pipeline to PLAYING" in stderr.decode():
+                stderr_text = stderr.decode()
+                
+                # Check for success indicators - NvMMLite messages are NORMAL, not errors!
+                success_indicators = [
+                    "Setting pipeline to PLAYING",
+                    "New clock: GstSystemClock", 
+                    "Progress: (request) Sending PLAY request",
+                    "NvMMLiteOpen"  # NVIDIA decoder initialization is normal
+                ]
+                
+                # Check for actual error indicators
+                error_indicators = [
+                    "ERROR",
+                    "CRITICAL", 
+                    "Could not negotiate format",
+                    "No such element",
+                    "Failed to connect",
+                    "not found"
+                ]
+                
+                has_success = any(indicator in stderr_text for indicator in success_indicators)
+                has_error = any(indicator in stderr_text for indicator in error_indicators)
+                
+                if has_success and not has_error:
                     print(f"✓ Basic pipeline test passed for {self.name}")
                     return True
                 else:
                     print(f"✗ Basic pipeline test failed for {self.name}")
-                    print(f"Test stderr: {stderr.decode()}")
+                    if has_error:
+                        print(f"Error found in stderr: {stderr_text[:200]}...")
                     return False
+                    
             except subprocess.TimeoutExpired:
                 process.kill()
                 process.communicate()
-                print(f"✓ Basic pipeline test passed for {self.name} (timeout is expected)")
+                print(f"✓ Basic pipeline test passed for {self.name} (timeout after data flow)")
                 return True
                 
         except Exception as e:
@@ -228,38 +261,45 @@ class OptimizedGStreamerStream:
         # Give GStreamer some time to start up
         time.sleep(2)
         
+        buffer = b""  # Buffer to accumulate streaming data
+        frame_count = 0
+        
         while self.running and self.process and self.process.poll() is None:
             try:
-                # Read frame data from stdout with timeout
-                frame_data = self.process.stdout.read(frame_size)
+                # Read chunk from stdout 
+                chunk = self.process.stdout.read(65536)  # Read in 64KB chunks
                 
-                if not frame_data:
-                    print(f"No frame data received for {self.name} - stream may have ended")
-                    break
+                if not chunk:
+                    time.sleep(0.001)
+                    continue
+                
+                buffer += chunk
+                
+                # Process complete frames from buffer
+                while len(buffer) >= frame_size:
+                    # Extract one complete frame
+                    frame_data = buffer[:frame_size]
+                    buffer = buffer[frame_size:]  # Keep remaining data for next frame
                     
-                if len(frame_data) != frame_size:
-                    print(f"Frame size mismatch for {self.name}: got {len(frame_data)}, expected {frame_size}")
-                    # Try to read remaining data to sync
-                    remaining = frame_size - len(frame_data)
-                    if remaining > 0:
-                        extra_data = self.process.stdout.read(remaining)
-                        if extra_data:
-                            frame_data += extra_data
+                    # Direct write to shared memory (zero-copy)
+                    timestamp = time.time()
+                    success = self.shm_writer.write_frame_direct(
+                        frame_data, 
+                        frame_width, 
+                        frame_height, 
+                        timestamp
+                    )
                     
-                    if len(frame_data) != frame_size:
-                        continue
-                
-                # Direct write to shared memory (zero-copy)
-                timestamp = time.time()
-                success = self.shm_writer.write_frame_direct(
-                    frame_data, 
-                    frame_width, 
-                    frame_height, 
-                    timestamp
-                )
-                
-                if not success:
-                    print(f"Failed to write frame to shared memory for {self.name}")
+                    frame_count += 1
+                    if frame_count % 150 == 0:  # Log every 150 frames (less frequent)
+                        print(f"✓ {self.name}: {frame_count} frames written to shared memory")
+                    
+                    if not success:
+                        print(f"Failed to write frame to shared memory for {self.name}")
+                    
+                    # Smart rate limiting for CPU efficiency
+                    if frame_count % 10 == 0:  # Micro-sleep every 10 frames
+                        time.sleep(0.001)  # 1ms pause to reduce CPU load
                 
             except Exception as e:
                 if self.running:

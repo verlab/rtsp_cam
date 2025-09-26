@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>rtsp_camera_streamer</name>
+  <name>rtsp_cam</name>
   <version>1.0.0</version>
   <description>High-performance RTSP camera streamer with hardware acceleration for Jetson platforms</description>
 

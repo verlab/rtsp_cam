@@ -12,7 +12,7 @@ COPY scripts/rtsp_streamer_node.py /app/
 COPY stream_server/entrypoint.sh /app/
 COPY config/ /app/config/
 COPY test_imports.py /app/
-RUN chmod +x /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh /app/rtsp_streamer_node.py
 
 # Set environment for hardware acceleration
 ENV NVIDIA_VISIBLE_DEVICES=all

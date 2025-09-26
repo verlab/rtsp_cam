@@ -42,10 +42,6 @@ else
     echo "✗ Config file missing: /app/config/cameras.json"
 fi
 
-# List available files for debugging
-echo "Available files in /app:"
-ls -la /app/
-
 echo "Starting main application..."
 
 # Debug: Show what command will be executed

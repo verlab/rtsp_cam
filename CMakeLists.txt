@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0.2)
-project(rtsp_camera_streamer)
+project(rtsp_cam)
 
 ## Find catkin macros and libraries
 find_package(catkin REQUIRED COMPONENTS
@@ -44,12 +44,20 @@ include_directories(
 ## Install ##
 #############
 
-# Install Python executables
-catkin_install_python(PROGRAMS
-  scripts/rtsp_streamer_node.py
-  scripts/rtsp_publisher_node.py
-  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-)
+# Install Python executables (conditionally based on what exists)
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/scripts/rtsp_streamer_node.py")
+  catkin_install_python(PROGRAMS
+    scripts/rtsp_streamer_node.py
+    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+  )
+endif()
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/scripts/rtsp_publisher_node.py")
+  catkin_install_python(PROGRAMS
+    scripts/rtsp_publisher_node.py
+    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+  )
+endif()
 
 # Install launch files
 install(DIRECTORY launch/
