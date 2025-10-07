@@ -50,8 +50,7 @@ services:
     ipc: host  # Share IPC namespace with host
     shm_size: '2g'  # Allocate shared memory for ROS
     environment:
-      - ROS_MASTER_URI=${ROS_MASTER_URI:-http://localhost:11311}
-      - ROS_HOSTNAME=${ROS_HOSTNAME:-localhost}
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}  # ROS 2 domain ID
       - CONFIG_FILE=/app/config/cameras.json
       - DISPLAY=${DISPLAY:-:0}  # X11 display for GUI applications
       - QT_X11_NO_MITSHM=1     # Disable MIT-SHM for QT apps

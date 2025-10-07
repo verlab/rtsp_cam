@@ -1,19 +1,19 @@
 #!/bin/bash
 set -e
 
-echo "=== ROS Publisher Starting ==="
+echo "=== ROS 2 Publisher Starting ==="
 
-# Source ROS environment and workspace
-source /opt/ros/noetic/setup.bash
-source /catkin_ws/devel/setup.bash
+# Source ROS 2 environment and workspace
+source /opt/ros/jazzy/setup.bash
+source /colcon_ws/install/setup.bash
 
-# Check ROS environment
-echo "ROS_MASTER_URI: ${ROS_MASTER_URI:-http://localhost:11311}"
-echo "ROS_HOSTNAME: ${ROS_HOSTNAME:-localhost}"
-echo "ROS_PACKAGE_PATH: ${ROS_PACKAGE_PATH}"
+# Check ROS 2 environment
+echo "ROS_DISTRO: ${ROS_DISTRO}"
+echo "ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}"
+echo "AMENT_PREFIX_PATH: ${AMENT_PREFIX_PATH}"
 
-# Set working directory to catkin workspace
-cd /catkin_ws
+# Set working directory to colcon workspace
+cd /colcon_ws
 
 # Execute main command
 exec "$@"

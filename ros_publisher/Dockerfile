@@ -1,7 +1,7 @@
-# ROS Publisher - Ubuntu 20.04 with ROS 1 Noetic
-FROM ubuntu:20.04
+# ROS Publisher - Ubuntu 24.04 with ROS 2 Jazzy
+FROM ubuntu:24.04
 
-ARG ROS_DISTRO=noetic
+ARG ROS_DISTRO=jazzy
 
 # Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive
@@ -11,32 +11,36 @@ ENV PYTHONUNBUFFERED=1
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     curl \
+    gnupg2 \
+    lsb-release \
     python3-pip \
     python3-numpy \
+    software-properties-common \
     && rm -rf /var/lib/apt/lists/*
 
-# Set up ROS 1 Noetic repository
-RUN curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key | apt-key add - \
-    && echo "deb http://packages.ros.org/ros/ubuntu focal main" > /etc/apt/sources.list.d/ros-latest.list
+# Set up ROS 2 Jazzy repository
+RUN curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" | tee /etc/apt/sources.list.d/ros2.list > /dev/null
 
-# Install ROS 1 Noetic with image_transport and GUI tools
+# Install ROS 2 Jazzy with image_transport and GUI tools
 RUN apt-get update && apt-get install -y \
-    ros-noetic-ros-core \
-    ros-noetic-rospy \
-    ros-noetic-std-msgs \
-    ros-noetic-sensor-msgs \
-    ros-noetic-geometry-msgs \
-    ros-noetic-image-transport \
-    ros-noetic-cv-bridge \
-    ros-noetic-compressed-image-transport \
-    ros-noetic-theora-image-transport \
-    ros-noetic-image-view \
-    ros-noetic-tf2-ros \
-    ros-noetic-rviz \
-    ros-noetic-rqt \
-    ros-noetic-rqt-image-view \
+    ros-jazzy-ros-base \
+    ros-jazzy-rclpy \
+    ros-jazzy-std-msgs \
+    ros-jazzy-sensor-msgs \
+    ros-jazzy-geometry-msgs \
+    ros-jazzy-image-transport \
+    ros-jazzy-cv-bridge \
+    ros-jazzy-compressed-image-transport \
+    ros-jazzy-theora-image-transport \
+    ros-jazzy-image-view \
+    ros-jazzy-tf2-ros \
+    ros-jazzy-rviz2 \
+    ros-jazzy-rqt \
+    ros-jazzy-rqt-image-view \
     python3-rosdep \
     python3-opencv \
+    python3-colcon-common-extensions \
     x11-apps \
     mesa-utils \
     libgl1-mesa-glx \
@@ -61,14 +65,14 @@ COPY package.xml /app/
 COPY CMakeLists.txt /app/
 RUN chmod +x /app/entrypoint.sh
 
-# Set up ROS workspace with proper package structure
-RUN mkdir -p /catkin_ws/src/rtsp_cam && \
-    cp -r /app/* /catkin_ws/src/rtsp_cam/ && \
-    cd /catkin_ws && \
-    /bin/bash -c "source /opt/ros/noetic/setup.bash && catkin_make"
+# Set up ROS 2 workspace with proper package structure
+RUN mkdir -p /colcon_ws/src/rtsp_cam && \
+    cp -r /app/* /colcon_ws/src/rtsp_cam/ && \
+    cd /colcon_ws && \
+    /bin/bash -c "source /opt/ros/jazzy/setup.bash && colcon build"
 
-# Source ROS environment
-RUN echo "source /opt/ros/noetic/setup.bash" >> ~/.bashrc
+# Source ROS 2 environment
+RUN echo "source /opt/ros/jazzy/setup.bash" >> ~/.bashrc
 
 ENTRYPOINT ["/app/entrypoint.sh"]
-CMD ["roslaunch", "rtsp_cam", "rtsp_camera.launch"]
+CMD ["ros2", "launch", "rtsp_cam", "rtsp_camera.launch.py"]
